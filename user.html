@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<html lang="en">
+
+<head>
+    <title>Escrow Production</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackcrow Escrow Workspace</title>
+    <link rel="icon" href="images/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <h1>Escrow App</h1>
+    <p>Use Postman or frontend framework to interact.</p>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand-block">
+                <img src="images/logo.png" alt="BlackCrow Logo" class="brand-logo">
+                <div>
+                    <p class="eyebrow">Escrow Control</p>
+                    <h1>blackcrow</h1>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav" aria-label="Primary">
+                <button class="nav-chip is-active" data-jump="overview">Overview</button>
+                <button class="nav-chip" data-jump="transactions">Transactions</button>
+                <button class="nav-chip" data-jump="composer">Create Escrow</button>
+                <button class="nav-chip" data-jump="activity">Activity</button>
+            </nav>
+
+            <section class="sidebar-panel">
+                <p class="section-kicker">Trust posture</p>
+                <ul class="trust-list">
+                    <li>Dual-party tracking on every escrow</li>
+                    <li>Manual release controls before payout</li>
+                    <li>Instant workspace summaries for ops review</li>
+                </ul>
+            </section>
+
+            <section class="sidebar-panel condensed">
+                <p class="section-kicker">Ops contact</p>
+                <strong>Settlement Desk</strong>
+                <span>Monitored continuously</span>
+            </section>
+        </aside>
+
+        <main class="workspace">
+            <header class="topbar" id="overview">
+                <div>
+                    <p class="eyebrow">Operations Workspace</p>
+                    <h2>Escrow deals without the spreadsheet scramble.</h2>
+                </div>
+
+                <div class="topbar-actions">
+                    <div class="connection-pill" id="connection-pill">
+                        <span class="dot"></span>
+                        <span id="connection-label">Checking backend</span>
+                    </div>
+                    <button class="primary-button" id="focus-composer">New escrow</button>
+                    <a href="landingpage.html" class="primary-button">Logout</a>
+                </div>
+            </header>
+
+            <section class="hero-band">
+                <div class="hero-copy">
+                    <p class="hero-lead">
+                        Blackcrow keeps high-value handoffs visible, release conditions explicit, and both parties
+                        aligned from funding to settlement.
+                    </p>
+                    <div class="hero-tags">
+                        <span>Buyer funded</span>
+                        <span>Seller verified</span>
+                        <span>Release locked</span>
+                    </div>
+                </div>
+
+                <div class="signal-stack">
+                    <article class="signal-card">
+                        <span>Protected volume</span>
+                        <strong id="protected-volume">$0</strong>
+                    </article>
+                    <article class="signal-card">
+                        <span>Completion rate</span>
+                        <strong id="completion-rate">0%</strong>
+                    </article>
+                </div>
+            </section>
+
+            <section class="stats-grid" aria-label="Portfolio metrics">
+                <article class="stat-tile">
+                    <span>Total escrows</span>
+                    <strong id="stat-total">0</strong>
+                    <small>Active workspace deals</small>
+                </article>
+                <article class="stat-tile">
+                    <span>Pending release</span>
+                    <strong id="stat-pending">0</strong>
+                    <small>Waiting on confirmation</small>
+                </article>
+                <article class="stat-tile">
+                    <span>Under review</span>
+                    <strong id="stat-review">0</strong>
+                    <small>Inspection or dispute window</small>
+                </article>
+                <article class="stat-tile">
+                    <span>Completed</span>
+                    <strong id="stat-completed">0</strong>
+                    <small>Settled and archived</small>
+                </article>
+            </section>
+
+            <section class="content-grid">
+                <section class="board-section" id="transactions">
+                    <div class="section-heading">
+                        <div>
+                            <p class="section-kicker">Transaction board</p>
+                            <h3>Escrows in motion</h3>
+                        </div>
+
+                        <div class="toolbar">
+                            <label class="search-shell">
+                                <span class="sr-only">Search transactions</span>
+                                <input type="search" id="search-input" placeholder="Search party or deal">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="filter-row" role="tablist" aria-label="Transaction filters">
+                        <button class="filter-pill is-active" data-filter="all">All</button>
+                        <button class="filter-pill" data-filter="pending">Pending</button>
+                        <button class="filter-pill" data-filter="review">Review</button>
+                        <button class="filter-pill" data-filter="completed">Completed</button>
+                    </div>
+
+                    <div class="transactions-list" id="transactions-list"></div>
+                </section>
+
+                <section class="composer-section" id="composer">
+                    <div class="section-heading">
+                        <div>
+                            <p class="section-kicker">Create escrow</p>
+                            <h3>Open a new protected transaction</h3>
+                        </div>
+                    </div>
+
+                    <form class="composer-form" id="escrow-form">
+                        <label>
+                            Seller
+                            <input type="text" id="seller-name" name="sellerName" placeholder="Nova Supply Co."
+                                required>
+                        </label>
+
+                        <label>
+                            Buyer
+                            <input type="text" id="buyer-name" name="buyerName" placeholder="Kite Retail Group"
+                                required>
+                        </label>
+
+                        <div class="split-fields">
+                            <label>
+                                Amount
+                                <input type="number" id="amount" name="amount" min="100" step="50" placeholder="8500"
+                                    required>
+                            </label>
+
+                            <label>
+                                Inspection days
+                                <input type="number" id="inspection-days" name="inspectionDays" min="1" max="30"
+                                    value="5" required>
+                            </label>
+                        </div>
+
+                        <label>
+                            Release condition
+                            <select id="release-condition" name="releaseCondition">
+                                <option value="Delivery confirmation">Delivery confirmation</option>
+                                <option value="Milestone approval">Milestone approval</option>
+                                <option value="Document verification">Document verification</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Deal note
+                            <textarea id="deal-note" name="dealNote" rows="4"
+                                placeholder="What must happen before payout can be released?"></textarea>
+                        </label>
+
+                        <div class="form-actions">
+                            <button class="primary-button" type="submit">Create escrow</button>
+                            <p class="micro-copy">Transactions created here are stored in frontend state for now.</p>
+                        </div>
+                    </form>
+                </section>
+            </section>
+
+            <section class="activity-grid" id="activity">
+                <section class="activity-section">
+                    <div class="section-heading">
+                        <div>
+                            <p class="section-kicker">Recent activity</p>
+                            <h3>Latest escrow events</h3>
+                        </div>
+                    </div>
+                    <div class="activity-feed" id="activity-feed"></div>
+                </section>
+
+                <section class="spotlight-section">
+                    <div class="section-heading">
+                        <div>
+                            <p class="section-kicker">Release rules</p>
+                            <h3>Control points that matter</h3>
+                        </div>
+                    </div>
+
+                    <div class="spotlight-list">
+                        <article>
+                            <span class="spotlight-step">01</span>
+                            <div>
+                                <strong>Funding hold</strong>
+                                <p>Capture the agreement before any release path opens.</p>
+                            </div>
+                        </article>
+                        <article>
+                            <span class="spotlight-step">02</span>
+                            <div>
+                                <strong>Evidence window</strong>
+                                <p>Give both sides one clear inspection phase with visible deadlines.</p>
+                            </div>
+                        </article>
+                        <article>
+                            <span class="spotlight-step">03</span>
+                            <div>
+                                <strong>Release approval</strong>
+                                <p>Only mark completion after the delivery condition is satisfied.</p>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <div class="toast" id="toast" aria-live="polite"></div>
+
+    <script src="./app.js"></script>
+</body>
+
+</html>
