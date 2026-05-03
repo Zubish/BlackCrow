@@ -19,7 +19,7 @@
                 <p class="eyebrow">Join BlackCrow Escrow</p>
             </div>
         </div>
-        <form class="auth-form">
+        <form class="auth-form" id="signup-form">
             <h2>Sign Up</h2>
             <div class="auth-form-grid">
                 <div class="auth-form-panel">
@@ -43,7 +43,7 @@
                         <label for="signup-confirm-password">Confirm Password</label>
                         <input type="password" id="signup-confirm-password" name="confirm-password" required>
                     </div>
-                    <a href="user.html" class="primary-button">Sign Up</a>
+                    <button class="primary-button" type="submit">Sign Up</button>
                 </div>
                 <div class="auth-divider-vertical"><span>or</span></div>
                 <div class="auth-side-panel">
@@ -77,5 +77,27 @@
             <p class="auth-link">Already have an account? <a href="login.html">Log In</a></p>
         </form>
     </div>
+    <script>
+        document.getElementById("signup-form").addEventListener("submit", (event) => {
+            event.preventDefault();
+            const password = document.getElementById("signup-password");
+            const confirmPassword = document.getElementById("signup-confirm-password");
+
+            if (password.value !== confirmPassword.value) {
+                confirmPassword.setCustomValidity("Passwords must match.");
+                confirmPassword.reportValidity();
+                return;
+            }
+
+            confirmPassword.setCustomValidity("");
+            window.location.href = "user.html";
+        });
+
+        ["signup-password", "signup-confirm-password"].forEach((id) => {
+            document.getElementById(id).addEventListener("input", () => {
+                document.getElementById("signup-confirm-password").setCustomValidity("");
+            });
+        });
+    </script>
 </body>
 </html>

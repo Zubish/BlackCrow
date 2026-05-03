@@ -19,7 +19,7 @@
                 <p class="eyebrow">Secure Escrow Login</p>
             </div>
         </div>
-        <form class="auth-form">
+        <form class="auth-form" id="login-form">
             <h2>Log In</h2>
             <div class="auth-form-grid">
                 <div class="auth-form-panel">
@@ -31,7 +31,7 @@
                         <label for="login-password">Password</label>
                         <input type="password" id="login-password" name="password" required>
                     </div>
-                    <a href="user.html" class="primary-button">Log In</a>
+                    <button class="primary-button" type="submit">Log In</button>
                 </div>
                 <div class="auth-divider-vertical"><span>or</span></div>
                 <div class="auth-side-panel">
@@ -65,5 +65,11 @@
             <p class="auth-link">Don't have an account? <a href="signup.html">Sign Up</a></p>
         </form>
     </div>
+    <script>
+        document.getElementById("login-form").addEventListener("submit", (event) => {
+            event.preventDefault();
+            window.location.href = "user.html";
+        });
+    </script>
 </body>
 </html>

@@ -1,9 +1,7 @@
 <!DOCTYPE html>
-<html>
 <html lang="en">
 
 <head>
-    <title>Escrow Production</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blackcrow Escrow Workspace</title>
@@ -15,40 +13,71 @@
     <link rel="stylesheet" href="./style.css">
 </head>
 
-<body>
-    <h1>Escrow App</h1>
-    <p>Use Postman or frontend framework to interact.</p>
-    <div class="app-shell">
-        <aside class="sidebar">
+<body class="dashboard-page">
+    <nav class="navbar">
+        <div class="navbar-container">
             <div class="brand-block">
                 <img src="images/logo.png" alt="BlackCrow Logo" class="brand-logo">
                 <div>
-                    <p class="eyebrow">Escrow Control</p>
-                    <h1>blackcrow</h1>
+                    <h1>BlackCrow</h1>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <div class="wallet-pill" aria-label="Wallet balance">
+                    <span class="wallet-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M4 7.5h14.5A2.5 2.5 0 0 1 21 10v7a2.5 2.5 0 0 1-2.5 2.5h-14A2.5 2.5 0 0 1 2 17V7.5A2.5 2.5 0 0 1 4.5 5H17"></path>
+                            <path d="M17 13h4"></path>
+                            <path d="M17.5 13.1v-.2"></path>
+                        </svg>
+                    </span>
+                    <strong id="wallet-balance">₦--</strong>
+                    <button class="wallet-toggle" id="wallet-toggle" type="button" aria-label="Show wallet balance"
+                        aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                            <circle cx="12" cy="12" r="2.6"></circle>
+                            <path class="eye-slash" d="M4 4l16 16"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="profile-menu">
+                    <button class="profile-trigger" id="profile-trigger" type="button" aria-label="Open profile menu"
+                        aria-expanded="false" aria-controls="profile-menu">
+                        <img src="images/profile_photo.jpg" alt="Profile" class="profile-img">
+                    </button>
+                    <div class="profile-menu-list" id="profile-menu" role="menu">
+                        <a href="#" role="menuitem">Profile</a>
+                        <a href="#" role="menuitem">Settings</a>
+                        <a href="landingpage.html" role="menuitem">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand-block">
+                <div>
+                    <p class="eyebrow">Control Center</p>
                 </div>
             </div>
 
             <nav class="sidebar-nav" aria-label="Primary">
                 <button class="nav-chip is-active" data-jump="overview">Overview</button>
                 <button class="nav-chip" data-jump="transactions">Transactions</button>
+                <button class="nav-chip" data-jump="wallet">Wallet</button>
                 <button class="nav-chip" data-jump="composer">Create Escrow</button>
                 <button class="nav-chip" data-jump="activity">Activity</button>
             </nav>
 
-            <section class="sidebar-panel">
-                <p class="section-kicker">Trust posture</p>
-                <ul class="trust-list">
-                    <li>Dual-party tracking on every escrow</li>
-                    <li>Manual release controls before payout</li>
-                    <li>Instant workspace summaries for ops review</li>
-                </ul>
-            </section>
-
-            <section class="sidebar-panel condensed">
+            <!-- <section class="sidebar-panel condensed">
                 <p class="section-kicker">Ops contact</p>
                 <strong>Settlement Desk</strong>
                 <span>Monitored continuously</span>
-            </section>
+            </section> -->
+
+            <button class="sidebar-logout" type="button">Log out</button>
         </aside>
 
         <main class="workspace">
@@ -58,14 +87,6 @@
                     <h2>Escrow deals without the spreadsheet scramble.</h2>
                 </div>
 
-                <div class="topbar-actions">
-                    <div class="connection-pill" id="connection-pill">
-                        <span class="dot"></span>
-                        <span id="connection-label">Checking backend</span>
-                    </div>
-                    <button class="primary-button" id="focus-composer">New escrow</button>
-                    <a href="landingpage.html" class="primary-button">Logout</a>
-                </div>
             </header>
 
             <section class="hero-band">
@@ -84,11 +105,11 @@
                 <div class="signal-stack">
                     <article class="signal-card">
                         <span>Protected volume</span>
-                        <strong id="protected-volume">$0</strong>
+                        <strong id="protected-volume"></strong>
                     </article>
                     <article class="signal-card">
                         <span>Completion rate</span>
-                        <strong id="completion-rate">0%</strong>
+                        <strong id="completion-rate"></strong>
                     </article>
                 </div>
             </section>
@@ -96,24 +117,33 @@
             <section class="stats-grid" aria-label="Portfolio metrics">
                 <article class="stat-tile">
                     <span>Total escrows</span>
-                    <strong id="stat-total">0</strong>
+                    <strong id="stat-total"></strong>
                     <small>Active workspace deals</small>
                 </article>
                 <article class="stat-tile">
                     <span>Pending release</span>
-                    <strong id="stat-pending">0</strong>
+                    <strong id="stat-pending"></strong>
                     <small>Waiting on confirmation</small>
                 </article>
                 <article class="stat-tile">
                     <span>Under review</span>
-                    <strong id="stat-review">0</strong>
+                    <strong id="stat-review"></strong>
                     <small>Inspection or dispute window</small>
                 </article>
                 <article class="stat-tile">
                     <span>Completed</span>
-                    <strong id="stat-completed">0</strong>
+                    <strong id="stat-completed"></strong>
                     <small>Settled and archived</small>
                 </article>
+            </section>
+
+            <section class="wallet-section" id="wallet">
+                <div>
+                    <p class="section-kicker">Wallet</p>
+                    <h3>Released funds ready for withdrawal</h3>
+                </div>
+                <strong id="wallet-section-balance">₦--</strong>
+                <small>Funds appear here after buyer confirmation and escrow release.</small>
             </section>
 
             <section class="content-grid">
@@ -146,36 +176,40 @@
                     <div class="section-heading">
                         <div>
                             <p class="section-kicker">Create escrow</p>
-                            <h3>Open a new protected transaction</h3>
+                            <h3>Create a shareable escrow link</h3>
                         </div>
                     </div>
 
                     <form class="composer-form" id="escrow-form">
+                        <fieldset class="role-selector">
+                            <legend>I am the</legend>
+                            <label>
+                                <input type="radio" name="initiatorRole" value="seller" checked>
+                                <span>Seller</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="initiatorRole" value="buyer">
+                                <span>Buyer</span>
+                            </label>
+                        </fieldset>
+
                         <label>
-                            Seller
-                            <input type="text" id="seller-name" name="sellerName" placeholder="Nova Supply Co."
+                            Other party name or email
+                            <input type="text" id="other-party" name="otherParty" placeholder="Kite Retail Group or buyer@email.com"
                                 required>
                         </label>
 
                         <label>
-                            Buyer
-                            <input type="text" id="buyer-name" name="buyerName" placeholder="Kite Retail Group"
+                            Amount
+                            <input type="number" id="amount" name="amount" min="100" step="50" placeholder="8500"
                                 required>
                         </label>
 
-                        <div class="split-fields">
-                            <label>
-                                Amount
-                                <input type="number" id="amount" name="amount" min="100" step="50" placeholder="8500"
-                                    required>
-                            </label>
-
-                            <label>
-                                Inspection days
-                                <input type="number" id="inspection-days" name="inspectionDays" min="1" max="30"
-                                    value="5" required>
-                            </label>
-                        </div>
+                        <label>
+                            What is being sold?
+                            <input type="text" id="item-description" name="itemDescription" placeholder="iPhone 15 Pro, website project, wholesale order"
+                                required>
+                        </label>
 
                         <label>
                             Release condition
@@ -186,17 +220,18 @@
                             </select>
                         </label>
 
-                        <label>
-                            Deal note
-                            <textarea id="deal-note" name="dealNote" rows="4"
-                                placeholder="What must happen before payout can be released?"></textarea>
-                        </label>
-
                         <div class="form-actions">
-                            <button class="primary-button" type="submit">Create escrow</button>
-                            <p class="micro-copy">Transactions created here are stored in frontend state for now.</p>
+                            <button class="primary-button" type="submit">Create escrow link</button>
                         </div>
                     </form>
+
+                    <div class="escrow-link-panel" id="escrow-link-panel" hidden>
+                        <span>Share this link with the other party</span>
+                        <div class="escrow-link-row">
+                            <input type="text" id="escrow-link" readonly>
+                            <button class="action-button" id="copy-escrow-link" type="button">Copy</button>
+                        </div>
+                    </div>
                 </section>
             </section>
 
@@ -249,7 +284,7 @@
 
     <div class="toast" id="toast" aria-live="polite"></div>
 
-    <script src="./app.js"></script>
+    <script src="./script.js"></script>
 </body>
 
 </html>

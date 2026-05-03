@@ -1,6 +1,7 @@
 const state = {
     filter: "all",
     query: "",
+    walletVisible: false,
     transactions: [
         {
             id: "BC-2401",
@@ -48,6 +49,15 @@ const elements = {
     focusComposer: document.getElementById("focus-composer"),
     connectionPill: document.getElementById("connection-pill"),
     connectionLabel: document.getElementById("connection-label"),
+    profileMenu: document.querySelector(".profile-menu"),
+    profileTrigger: document.getElementById("profile-trigger"),
+    sidebarLogout: document.querySelector(".sidebar-logout"),
+    escrowLinkPanel: document.getElementById("escrow-link-panel"),
+    escrowLinkInput: document.getElementById("escrow-link"),
+    copyEscrowLink: document.getElementById("copy-escrow-link"),
+    walletBalance: document.getElementById("wallet-balance"),
+    walletSectionBalance: document.getElementById("wallet-section-balance"),
+    walletToggle: document.getElementById("wallet-toggle"),
     protectedVolume: document.getElementById("protected-volume"),
     completionRate: document.getElementById("completion-rate"),
     statTotal: document.getElementById("stat-total"),
@@ -57,16 +67,16 @@ const elements = {
     toast: document.getElementById("toast")
 };
 
-const currency = new Intl.NumberFormat("en-US", {
+const currency = new Intl.NumberFormat("en-NG", {
     style: "currency",
-    currency: "USD",
+    currency: "NGN",
     maximumFractionDigits: 0
 });
 
 function getFilteredTransactions() {
     return state.transactions.filter((transaction) => {
         const matchesFilter = state.filter === "all" || transaction.status === state.filter;
-        const haystack = `${transaction.id} ${transaction.buyer} ${transaction.seller} ${transaction.condition}`.toLowerCase();
+        const haystack = `${transaction.id} ${transaction.buyer} ${transaction.seller} ${transaction.condition} ${transaction.item || ""}`.toLowerCase();
         const matchesQuery = haystack.includes(state.query.toLowerCase());
         return matchesFilter && matchesQuery;
     });
@@ -78,6 +88,9 @@ function renderStats() {
     const review = state.transactions.filter((item) => item.status === "review").length;
     const completed = state.transactions.filter((item) => item.status === "completed").length;
     const volume = state.transactions.reduce((sum, item) => sum + item.amount, 0);
+    const walletBalance = state.transactions
+        .filter((item) => item.status === "completed")
+        .reduce((sum, item) => sum + item.amount, 0);
     const completion = total ? Math.round((completed / total) * 100) : 0;
 
     elements.statTotal.textContent = total;
@@ -86,6 +99,8 @@ function renderStats() {
     elements.statCompleted.textContent = completed;
     elements.protectedVolume.textContent = currency.format(volume);
     elements.completionRate.textContent = `${completion}%`;
+    elements.walletSectionBalance.textContent = currency.format(walletBalance);
+    elements.walletBalance.textContent = state.walletVisible ? currency.format(walletBalance) : "₦--";
 }
 
 function renderTransactions() {
@@ -101,29 +116,40 @@ function renderTransactions() {
     }
 
     elements.transactionsList.innerHTML = items.map((transaction) => {
+        const id = escapeHtml(transaction.id);
+        const buyer = escapeHtml(transaction.buyer);
+        const seller = escapeHtml(transaction.seller);
+        const status = escapeHtml(transaction.status);
+        const condition = escapeHtml(transaction.condition);
+        const inspectionDays = escapeHtml(transaction.inspectionDays);
+        const note = escapeHtml(transaction.note);
+        const item = transaction.item
+            ? `<span class="meta-chip">${escapeHtml(transaction.item)}</span>`
+            : "";
         const action = transaction.status === "pending"
-            ? `<button class="action-button" data-action="complete" data-id="${transaction.id}">Mark completed</button>`
+            ? `<button class="action-button" data-action="complete" data-id="${id}">Mark completed</button>`
             : "";
 
         return `
             <article class="transaction-card">
                 <div class="transaction-head">
                     <div class="transaction-copy">
-                        <span>${transaction.id}</span>
-                        <strong>${transaction.buyer} -> ${transaction.seller}</strong>
+                        <span>${id}</span>
+                        <strong>${buyer} -> ${seller}</strong>
                     </div>
-                    <span class="status-badge ${transaction.status}">${capitalize(transaction.status)}</span>
+                    <span class="status-badge ${status}">${capitalize(status)}</span>
                 </div>
                 <div class="transaction-meta">
                     <div class="meta-group">
                         <span class="meta-chip">${currency.format(transaction.amount)}</span>
-                        <span class="meta-chip">${transaction.condition}</span>
-                        <span class="meta-chip">${transaction.inspectionDays} day inspection</span>
+                        ${item}
+                        <span class="meta-chip">${condition}</span>
+                        <span class="meta-chip">${inspectionDays} day inspection</span>
                     </div>
                     ${action}
                 </div>
-                <p>${transaction.note}</p>
-                <span class="micro-copy">Updated ${transaction.updatedAt}</span>
+                <p>${note}</p>
+                <span class="micro-copy">Updated ${escapeHtml(transaction.updatedAt)}</span>
             </article>
         `;
     }).join("");
@@ -132,16 +158,24 @@ function renderTransactions() {
 function renderActivity() {
     const ordered = [...state.transactions].slice(0, 5);
 
-    elements.activityFeed.innerHTML = ordered.map((transaction, index) => `
-        <article class="activity-item">
-            <div class="activity-mark">0${index + 1}</div>
-            <div class="activity-copy">
-                <strong>${transaction.id} ${activityLabel(transaction.status)}</strong>
-                <span>${transaction.buyer} with ${transaction.seller}</span>
-            </div>
-            <span class="micro-copy">${transaction.updatedAt}</span>
-        </article>
-    `).join("");
+    elements.activityFeed.innerHTML = ordered.map((transaction, index) => {
+        const id = escapeHtml(transaction.id);
+        const status = escapeHtml(transaction.status);
+        const buyer = escapeHtml(transaction.buyer);
+        const seller = escapeHtml(transaction.seller);
+        const updatedAt = escapeHtml(transaction.updatedAt);
+
+        return `
+            <article class="activity-item">
+                <div class="activity-mark">0${index + 1}</div>
+                <div class="activity-copy">
+                    <strong>${id} ${activityLabel(status)}</strong>
+                    <span>${buyer} with ${seller}</span>
+                </div>
+                <span class="micro-copy">${updatedAt}</span>
+            </article>
+        `;
+    }).join("");
 }
 
 function showToast(message) {
@@ -151,6 +185,16 @@ function showToast(message) {
     showToast.timeout = window.setTimeout(() => {
         elements.toast.classList.remove("is-visible");
     }, 2400);
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#039;"
+    }[character]));
 }
 
 function capitalize(value) {
@@ -189,9 +233,52 @@ function bindNavigation() {
         });
     });
 
-    elements.focusComposer.addEventListener("click", () => {
+    elements.focusComposer?.addEventListener("click", () => {
         document.getElementById("composer")?.scrollIntoView({ behavior: "smooth", block: "start" });
         document.getElementById("seller-name")?.focus();
+    });
+}
+
+function bindProfileMenu() {
+    if (!elements.profileMenu || !elements.profileTrigger) return;
+
+    elements.profileTrigger.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const isOpen = elements.profileMenu.classList.toggle("is-open");
+        elements.profileTrigger.setAttribute("aria-expanded", String(isOpen));
+    });
+
+    document.addEventListener("click", (event) => {
+        if (elements.profileMenu.contains(event.target)) return;
+        elements.profileMenu.classList.remove("is-open");
+        elements.profileTrigger.setAttribute("aria-expanded", "false");
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        elements.profileMenu.classList.remove("is-open");
+        elements.profileTrigger.setAttribute("aria-expanded", "false");
+    });
+
+    elements.sidebarLogout?.addEventListener("click", () => {
+        window.location.href = "landingpage.html";
+    });
+}
+
+function bindWalletBalance() {
+    if (!elements.walletToggle || !elements.walletBalance) return;
+
+    elements.walletToggle.classList.toggle("is-hidden", !state.walletVisible);
+
+    elements.walletToggle.addEventListener("click", () => {
+        state.walletVisible = !state.walletVisible;
+        elements.walletToggle.classList.toggle("is-hidden", !state.walletVisible);
+        elements.walletToggle.setAttribute("aria-pressed", String(state.walletVisible));
+        elements.walletToggle.setAttribute(
+            "aria-label",
+            state.walletVisible ? "Hide wallet balance" : "Show wallet balance"
+        );
+        renderStats();
     });
 }
 
@@ -217,28 +304,55 @@ function bindForm() {
 
         const formData = new FormData(elements.form);
         const nextId = `BC-${2400 + state.transactions.length + 1}`;
+        const initiatorRole = formData.get("initiatorRole");
+        const otherParty = formData.get("otherParty").trim();
+        const itemDescription = formData.get("itemDescription").trim();
+        const buyer = initiatorRole === "buyer" ? "You" : otherParty;
+        const seller = initiatorRole === "seller" ? "You" : otherParty;
+        const counterpartyRole = initiatorRole === "seller" ? "buyer" : "seller";
+        const shareLink = `https://blackcrow.app/escrow/${nextId.toLowerCase()}`;
 
         state.transactions.unshift({
             id: nextId,
-            seller: formData.get("sellerName").trim(),
-            buyer: formData.get("buyerName").trim(),
+            seller,
+            buyer,
             amount: Number(formData.get("amount")),
             status: "pending",
             condition: formData.get("releaseCondition"),
-            inspectionDays: Number(formData.get("inspectionDays")),
-            note: formData.get("dealNote").trim() || "Awaiting release condition details.",
+            inspectionDays: 5,
+            item: itemDescription,
+            note: `Awaiting ${counterpartyRole} acceptance and buyer funding.`,
+            shareLink,
             updatedAt: "Just now"
         });
 
         elements.form.reset();
-        document.getElementById("inspection-days").value = 5;
+        elements.form.querySelector("[name='initiatorRole'][value='seller']").checked = true;
+        if (elements.escrowLinkInput && elements.escrowLinkPanel) {
+            elements.escrowLinkInput.value = shareLink;
+            elements.escrowLinkPanel.hidden = false;
+        }
         renderAll();
-        showToast(`Escrow ${nextId} created.`);
+        showToast(`Escrow link ${nextId} created.`);
         document.getElementById("transactions")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    elements.copyEscrowLink?.addEventListener("click", async () => {
+        if (!elements.escrowLinkInput.value) return;
+
+        try {
+            await navigator.clipboard.writeText(elements.escrowLinkInput.value);
+            showToast("Escrow link copied.");
+        } catch (error) {
+            elements.escrowLinkInput.select();
+            showToast("Escrow link selected.");
+        }
     });
 }
 
 async function probeBackend() {
+    if (!elements.connectionPill || !elements.connectionLabel) return;
+
     try {
         await fetch("http://127.0.0.1:5000", { method: "GET" });
         elements.connectionPill.classList.add("online");
@@ -258,6 +372,8 @@ function renderAll() {
 bindFilters();
 bindSearch();
 bindNavigation();
+bindProfileMenu();
+bindWalletBalance();
 bindTransactionActions();
 bindForm();
 renderAll();
