@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Escrow - BlackCrow</title>
+    <link rel="icon" href="images/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body class="landing-page guest-page">
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a class="brand-block brand-link" href="landingpage.html">
+                <img src="images/logo.png" alt="BlackCrow Logo" class="brand-logo">
+                <div>
+                    <h1>BlackCrow</h1>
+                </div>
+            </a>
+            <div class="nav-actions">
+                <a href="quick-escrow.html" class="text-button">Create escrow</a>
+                <a href="login.html" class="text-button">Log in</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="guest-shell">
+        <section class="guest-card">
+            <div class="section-heading">
+                <div>
+                    <p class="section-kicker">Email-secured tracking</p>
+                    <h2>Track and act on an escrow</h2>
+                </div>
+            </div>
+            <p class="guest-lead">
+                Enter the escrow ID and the buyer or seller email attached to the transaction. Each party only sees the
+                actions that apply to them.
+            </p>
+
+            <form class="composer-form" id="track-form">
+                <label>
+                    Escrow ID
+                    <input type="text" id="track-escrow-id" placeholder="BC-2404" required>
+                </label>
+                <label>
+                    Your email
+                    <input type="email" id="track-email" placeholder="you@email.com" required>
+                </label>
+                <button class="primary-button" type="submit">Open escrow</button>
+            </form>
+
+            <section class="tracking-panel" id="tracking-panel" hidden>
+                <div id="tracking-summary"></div>
+                <div class="action-stack" id="tracking-actions"></div>
+            </section>
+        </section>
+
+        <section class="guest-side">
+            <article class="feature-card">
+                <h3>Buyer actions</h3>
+                <p>Accept terms, fund escrow, and release funds after the delivery condition is met.</p>
+            </article>
+            <article class="feature-card">
+                <h3>Seller actions</h3>
+                <p>Accept terms, mark delivery complete, and withdraw released wallet funds to a local bank.</p>
+            </article>
+            <article class="feature-card">
+                <h3>Prototype note</h3>
+                <p>This static version stores one-off escrows in this browser. Production will move this state to a
+                    backend so shared links work across devices.</p>
+            </article>
+        </section>
+    </main>
+
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <script src="./script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overview - Blackcrow Escrow</title>
+    <link rel="icon" href="images/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body class="dashboard-page">
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="brand-block">
+                <img src="images/logo.png" alt="BlackCrow Logo" class="brand-logo">
+                <div>
+                    <h1>BlackCrow</h1>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <div class="wallet-pill" aria-label="Wallet balance">
+                    <span class="wallet-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M4 7.5h14.5A2.5 2.5 0 0 1 21 10v7a2.5 2.5 0 0 1-2.5 2.5h-14A2.5 2.5 0 0 1 2 17V7.5A2.5 2.5 0 0 1 4.5 5H17"></path>
+                            <path d="M17 13h4"></path>
+                            <path d="M17.5 13.1v-.2"></path>
+                        </svg>
+                    </span>
+                    <strong id="wallet-balance">₦--</strong>
+                    <button class="wallet-toggle" id="wallet-toggle" type="button" aria-label="Show wallet balance"
+                        aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                            <circle cx="12" cy="12" r="2.6"></circle>
+                            <path class="eye-slash" d="M4 4l16 16"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="profile-menu">
+                    <button class="profile-trigger" id="profile-trigger" type="button" aria-label="Open profile menu"
+                        aria-expanded="false" aria-controls="profile-menu">
+                        <img src="images/profile_photo.jpg" alt="Profile" class="profile-img">
+                    </button>
+                    <div class="profile-menu-list" id="profile-menu" role="menu">
+                        <a href="#" role="menuitem">Profile</a>
+                        <a href="#" role="menuitem">Settings</a>
+                        <a href="landingpage.html" role="menuitem">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand-block">
+                <div>
+                    <p class="eyebrow">Control Center</p>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav" aria-label="Primary">
+                <a class="nav-chip is-active" href="overview.html">Overview</a>
+                <a class="nav-chip" href="transactions.html">Transactions</a>
+                <a class="nav-chip" href="wallet.html">Wallet</a>
+                <a class="nav-chip" href="create-escrow.html">Create Escrow</a>
+                <a class="nav-chip" href="activity.html">Activity</a>
+            </nav>
+
+            <button class="sidebar-logout" type="button">Log out</button>
+        </aside>
+
+        <main class="workspace">
+            <header class="topbar" id="overview">
+                <div>
+                    <p class="eyebrow">Operations Workspace</p>
+                    <h2>Escrow deals without the spreadsheet scramble.</h2>
+                </div>
+            </header>
+
+            <section class="hero-band">
+                <div class="hero-copy">
+                    <p class="hero-lead">
+                        Blackcrow keeps high-value handoffs visible, release conditions explicit, and both parties
+                        aligned from funding to settlement.
+                    </p>
+                    <div class="hero-tags">
+                        <span>Buyer funded</span>
+                        <span>Seller verified</span>
+                        <span>Release locked</span>
+                    </div>
+                </div>
+
+                <div class="signal-stack">
+                    <article class="signal-card">
+                        <span>Protected volume</span>
+                        <strong id="protected-volume"></strong>
+                    </article>
+                    <article class="signal-card">
+                        <span>Completion rate</span>
+                        <strong id="completion-rate"></strong>
+                    </article>
+                </div>
+            </section>
+
+            <section class="stats-grid" aria-label="Portfolio metrics">
+                <article class="stat-tile">
+                    <span>Total escrows</span>
+                    <strong id="stat-total"></strong>
+                    <small>Active workspace deals</small>
+                </article>
+                <article class="stat-tile">
+                    <span>Pending release</span>
+                    <strong id="stat-pending"></strong>
+                    <small>Waiting on confirmation</small>
+                </article>
+                <article class="stat-tile">
+                    <span>Under review</span>
+                    <strong id="stat-review"></strong>
+                    <small>Inspection or dispute window</small>
+                </article>
+                <article class="stat-tile">
+                    <span>Completed</span>
+                    <strong id="stat-completed"></strong>
+                    <small>Settled and archived</small>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <script src="./script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create One-Off Escrow - BlackCrow</title>
+    <link rel="icon" href="images/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body class="landing-page guest-page">
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a class="brand-block brand-link" href="landingpage.html">
+                <img src="images/logo.png" alt="BlackCrow Logo" class="brand-logo">
+                <div>
+                    <h1>BlackCrow</h1>
+                </div>
+            </a>
+            <div class="nav-actions">
+                <a href="track-escrow.html" class="text-button">Track escrow</a>
+                <a href="login.html" class="text-button">Log in</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="guest-shell">
+        <section class="guest-card">
+            <div class="section-heading">
+                <div>
+                    <p class="section-kicker">No account needed</p>
+                    <h2>Create a one-off escrow link</h2>
+                </div>
+            </div>
+            <p class="guest-lead">
+                Start as the buyer or seller. BlackCrow creates one link both parties can use to accept terms,
+                track progress, release funds, and withdraw after completion.
+            </p>
+
+            <form class="composer-form" id="guest-escrow-form">
+                <fieldset class="role-selector">
+                    <legend>I am the</legend>
+                    <label>
+                        <input type="radio" name="initiatorRole" value="seller" checked>
+                        <span>Seller</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="initiatorRole" value="buyer">
+                        <span>Buyer</span>
+                    </label>
+                </fieldset>
+
+                <div class="split-fields">
+                    <label>
+                        Your name
+                        <input type="text" name="initiatorName" placeholder="Musa Ibrahim" required>
+                    </label>
+                    <label>
+                        Your email
+                        <input type="email" name="initiatorEmail" placeholder="you@email.com" required>
+                    </label>
+                </div>
+
+                <div class="split-fields">
+                    <label>
+                        Other party name
+                        <input type="text" name="otherPartyName" placeholder="Buyer or seller name" required>
+                    </label>
+                    <label>
+                        Other party email
+                        <input type="email" name="otherPartyEmail" placeholder="them@email.com" required>
+                    </label>
+                </div>
+
+                <label>
+                    Amount
+                    <input type="number" name="amount" min="100" step="50" placeholder="8500" required>
+                </label>
+
+                <label>
+                    What is being sold?
+                    <input type="text" name="itemDescription" placeholder="Phone, fashion order, website project" required>
+                </label>
+
+                <label>
+                    Release condition
+                    <select name="releaseCondition">
+                        <option value="Delivery confirmation">Delivery confirmation</option>
+                        <option value="Milestone approval">Milestone approval</option>
+                        <option value="Document verification">Document verification</option>
+                    </select>
+                </label>
+
+                <button class="primary-button" type="submit">Create escrow link</button>
+            </form>
+
+            <div class="escrow-link-panel" id="escrow-link-panel" hidden>
+                <span>Share this link with the other party</span>
+                <div class="escrow-link-row">
+                    <input type="text" id="escrow-link" readonly>
+                    <button class="action-button" id="copy-escrow-link" type="button">Copy</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="guest-side">
+            <article class="feature-card">
+                <h3>How this one-off link works</h3>
+                <ol class="flow-list">
+                    <li>Create the link with both emails.</li>
+                    <li>Both parties open the link and verify by email.</li>
+                    <li>Buyer funds escrow after accepting terms.</li>
+                    <li>Seller delivers, buyer releases, seller withdraws.</li>
+                </ol>
+            </article>
+            <article class="feature-card">
+                <h3>Why it stays simple</h3>
+                <p>No dashboard is required for a single transaction. If you later want saved parties, wallet history,
+                    and repeat deals, you can create a full BlackCrow account.</p>
+            </article>
+        </section>
+    </main>
+
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <script src="./script.js"></script>
+</body>
+
+</html>
