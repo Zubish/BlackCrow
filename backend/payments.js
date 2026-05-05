@@ -44,6 +44,7 @@ function createSimulatedProvider() {
 
 function createPaystackProvider() {
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
+    const publicAppUrl = String(process.env.PUBLIC_APP_URL || "").replace(/\/+$/, "");
     if (!secretKey) {
         throw new Error("PAYMENT_PROVIDER=paystack requires PAYSTACK_SECRET_KEY.");
     }
@@ -53,21 +54,26 @@ function createPaystackProvider() {
 
         async initialize({ escrow, buyerEmail }) {
             const reference = `bc_${escrow.id.toLowerCase()}_${crypto.randomBytes(8).toString("hex")}`;
+            const body = {
+                email: buyerEmail,
+                amount: Math.round(Number(escrow.amount) * 100),
+                reference,
+                metadata: {
+                    escrowId: escrow.id,
+                    buyerEmail
+                }
+            };
+            if (publicAppUrl) {
+                body.callback_url = `${publicAppUrl}/track-escrow.html?id=${encodeURIComponent(escrow.id)}`;
+            }
+
             const response = await fetch("https://api.paystack.co/transaction/initialize", {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${secretKey}`,
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({
-                    email: buyerEmail,
-                    amount: Math.round(Number(escrow.amount) * 100),
-                    reference,
-                    metadata: {
-                        escrowId: escrow.id,
-                        buyerEmail
-                    }
-                })
+                body: JSON.stringify(body)
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.status) {

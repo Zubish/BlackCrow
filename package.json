@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node backend/server.js",
+    "build": "node -e \"console.log('BlackCrow uses static frontend assets; no build step required.')\"",
     "migrate": "node backend/migrate.js",
     "smoke": "node backend/smoke-test.js",
     "check": "node --check backend/server.js && node --check backend/email.js && node --check backend/payments.js && node --check backend/migrate.js && node --check backend/smoke-test.js && node --check backend/storage/fileStore.js && node --check backend/storage/postgresStore.js && node --check backend/storage/index.js && node --check script.js"

@@ -75,6 +75,7 @@ const defaultTransactions = [
 
 const API_BASE = window.BLACKCROW_API_BASE
     || (window.location.protocol === "file:" ? "http://127.0.0.1:5000/api" : "/api");
+const TRACKING_SESSION_KEY = "blackcrow-tracking-session";
 
 const state = {
     filter: "all",
@@ -84,7 +85,7 @@ const state = {
     currentUser: loadAuthUser(),
     walletBalanceValue: null,
     activityEvents: [],
-    trackingSession: null,
+    trackingSession: loadTrackingSession(),
     transactions: loadTransactions()
 };
 
@@ -158,6 +159,29 @@ function loadAuthUser() {
     } catch (error) {
         return null;
     }
+}
+
+function loadTrackingSession() {
+    try {
+        const saved = window.localStorage.getItem(TRACKING_SESSION_KEY);
+        return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function saveTrackingSession(session) {
+    const persisted = {
+        ...session,
+        savedAt: new Date().toISOString()
+    };
+    window.localStorage.setItem(TRACKING_SESSION_KEY, JSON.stringify(persisted));
+    state.trackingSession = persisted;
+}
+
+function clearTrackingSession() {
+    window.localStorage.removeItem(TRACKING_SESSION_KEY);
+    state.trackingSession = null;
 }
 
 function getAuthToken() {
@@ -832,6 +856,10 @@ function bindTracking() {
     if (idFromUrl && elements.trackEscrowId) {
         elements.trackEscrowId.value = idFromUrl.toUpperCase();
     }
+    if (state.trackingSession && elements.trackEscrowId && elements.trackEmail) {
+        if (!elements.trackEscrowId.value) elements.trackEscrowId.value = state.trackingSession.id || "";
+        if (!elements.trackEmail.value) elements.trackEmail.value = state.trackingSession.email || "";
+    }
 
     elements.trackForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -872,12 +900,12 @@ async function openTrackedEscrow() {
             body: { email, code }
         });
         const transaction = mapEscrow(data.escrow);
-        state.trackingSession = {
+        saveTrackingSession({
             id: transaction.id,
             email,
             role: data.role,
             token: data.token
-        };
+        });
         state.transactions = [transaction, ...state.transactions.filter((item) => item.id !== transaction.id)];
         state.backendOnline = true;
         saveTransactions();
@@ -886,7 +914,7 @@ async function openTrackedEscrow() {
         showToast("Escrow access verified.");
     } catch (error) {
         state.backendOnline = false;
-        state.trackingSession = null;
+        clearTrackingSession();
         if (isNetworkError(error)) {
             renderTracking();
         } else {
@@ -1028,6 +1056,57 @@ function hasValidWithdrawalDestination(destination) {
     return destination.bankName && destination.accountName && destination.accountNumber.length >= 8;
 }
 
+function isExternalPaymentUrl(url) {
+    return Boolean(url && !url.startsWith("simulated://"));
+}
+
+function getPaymentReferenceFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("reference") || params.get("trxref") || "";
+}
+
+async function resumePaymentReturn() {
+    if (!elements.trackForm || !state.trackingSession?.token) return;
+
+    const reference = getPaymentReferenceFromUrl();
+    if (!reference || state.trackingSession.role !== "buyer") return;
+    if (!elements.trackEscrowId.value && state.trackingSession.id) {
+        elements.trackEscrowId.value = state.trackingSession.id;
+    }
+    if (!elements.trackEmail.value && state.trackingSession.email) {
+        elements.trackEmail.value = state.trackingSession.email;
+    }
+
+    const context = getTrackedContext();
+    if (context.error) {
+        renderTracking(context.error);
+        return;
+    }
+
+    try {
+        const data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/payments/verify`, {
+            method: "POST",
+            body: {
+                token: context.token,
+                providerReference: reference
+            }
+        });
+        const transaction = mapEscrow(data.escrow);
+        state.transactions = [transaction, ...state.transactions.filter((item) => item.id !== transaction.id)];
+        saveTrackingSession({
+            ...state.trackingSession,
+            role: data.role || state.trackingSession.role
+        });
+        saveTransactions();
+        renderAll();
+        renderTracking();
+        window.history.replaceState({}, document.title, `track-escrow.html?id=${encodeURIComponent(transaction.id)}`);
+        showToast("Payment confirmed.");
+    } catch (error) {
+        renderTracking(error.message);
+    }
+}
+
 async function updateTrackedEscrow(action) {
     const context = getTrackedContext();
     if (context.error) return;
@@ -1069,12 +1148,17 @@ async function updateTrackedEscrow(action) {
             }
             const transaction = mapEscrow(data.escrow);
             state.transactions = [transaction, ...state.transactions.filter((item) => item.id !== transaction.id)];
-            state.trackingSession = {
+            saveTrackingSession({
                 ...state.trackingSession,
                 role: data.role || state.trackingSession.role
-            };
+            });
             state.backendOnline = true;
             saveTransactions();
+            if (action === "initialize-payment" && isExternalPaymentUrl(data.payment?.authorizationUrl)) {
+                showToast("Opening secure payment page.");
+                window.location.href = data.payment.authorizationUrl;
+                return;
+            }
             renderAll();
             renderTracking();
             showToast("Escrow updated.");
@@ -1184,6 +1268,7 @@ async function initializeApp() {
     hydrateUserFields();
     renderAll();
     probeBackend();
+    resumePaymentReturn();
 }
 
 initializeApp();

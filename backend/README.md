@@ -106,6 +106,7 @@ For Paystack later:
 ```text
 PAYMENT_PROVIDER=paystack
 PAYSTACK_SECRET_KEY=sk_...
+PUBLIC_APP_URL=https://yourdomain.com
 ```
 
 Payment flow:
@@ -117,6 +118,11 @@ Payment flow:
 5. Escrow moves to `funded`/`review`.
 
 Paystack webhooks are verified with `x-paystack-signature` and can also settle matching `charge.success` events.
+Set the Paystack webhook URL to:
+
+```text
+https://yourdomain.com/api/payments/paystack/webhook
+```
 
 ## Withdrawals
 

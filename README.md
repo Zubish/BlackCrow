@@ -70,6 +70,7 @@ NODE_ENV=production
 PORT=5000
 DATABASE_URL=postgresql://...
 DATABASE_SSL=true
+PUBLIC_APP_URL=https://yourdomain.com
 ALLOWED_ORIGINS=https://yourdomain.com
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=BlackCrow <verified@yourdomain.com>
@@ -130,13 +131,15 @@ The public list and raw email wallet endpoints are intentionally locked down for
 - Run `npm run migrate`.
 - Configure verified Resend sender domain.
 - Configure Paystack secret key and test payments.
+- Set Paystack webhook URL to `/api/payments/paystack/webhook`.
+- Set `PUBLIC_APP_URL` to the final domain.
 - Set `ALLOWED_ORIGINS` to the final domain.
 - Set `INTERNAL_API_SECRET`.
 - Start with `npm start`.
 
 ## Roadmap
 
-- Real Paystack payment callback/webhook handling.
+- Automated payout provider integration.
 - Bank account verification and automated payout provider.
 - Dispute workflow and support inbox.
 - Admin dashboard for payout review and fraud controls.

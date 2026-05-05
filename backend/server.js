@@ -48,6 +48,9 @@ function validateProductionConfig() {
 
     const missing = [];
     if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
+    if (!process.env.PUBLIC_APP_URL || process.env.PUBLIC_APP_URL.includes("localhost") || process.env.PUBLIC_APP_URL.includes("127.0.0.1")) {
+        missing.push("production PUBLIC_APP_URL");
+    }
     if (!process.env.RESEND_API_KEY) missing.push("RESEND_API_KEY");
     if (!process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL.includes("onboarding@resend.dev")) {
         missing.push("verified RESEND_FROM_EMAIL");
