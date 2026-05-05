@@ -60,8 +60,8 @@ https://yourdomain.com/api/payments/paystack/webhook
 Use:
 
 ```text
-Build command: npm run check
-Output directory: leave empty/default
+Build command: npm run build && npm run check
+Output directory: public
 Install command: npm install
 ```
 
