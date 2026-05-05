@@ -1064,8 +1064,18 @@ async function startServer() {
 }
 
 async function serverlessHandler(request, response) {
-    await initializeRuntime();
-    return handleRequest(request, response);
+    try {
+        await initializeRuntime();
+        return handleRequest(request, response);
+    } catch (error) {
+        response.writeHead(500, {
+            "Content-Type": "application/json",
+            ...securityHeaders(request.headers.origin || "")
+        });
+        response.end(JSON.stringify({
+            error: error.message || "Server initialization failed."
+        }));
+    }
 }
 
 if (require.main === module) {
