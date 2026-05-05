@@ -757,15 +757,8 @@ function bindForm() {
             transaction = await createEscrowOnBackend(payload, { auth: true });
         } catch (error) {
             state.backendOnline = false;
-            if (!isNetworkError(error)) {
-                showToast(error.message);
-                return;
-            }
-            if (getAuthToken()) {
-                showToast("Backend is offline. Account escrows need the backend.");
-                return;
-            }
-            transaction = addLocalEscrow(payload);
+            showToast(isNetworkError(error) ? "Backend unavailable. Escrow was not created." : error.message);
+            return;
         }
 
         saveTransactions();
@@ -830,11 +823,8 @@ function bindGuestEscrowForm() {
             transaction = await createEscrowOnBackend(payload);
         } catch (error) {
             state.backendOnline = false;
-            if (!isNetworkError(error)) {
-                showToast(error.message);
-                return;
-            }
-            transaction = addLocalEscrow(payload);
+            showToast(isNetworkError(error) ? "Backend unavailable. Escrow link was not created." : error.message);
+            return;
         }
 
         saveTransactions();

@@ -137,6 +137,8 @@ The public list and raw email wallet endpoints are intentionally locked down for
 - Set `INTERNAL_API_SECRET`.
 - Start with `npm start`.
 
+Vercel support is included through `api/[...path].js` and `vercel.json`.
+
 ## Roadmap
 
 - Automated payout provider integration.

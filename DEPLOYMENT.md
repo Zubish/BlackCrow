@@ -1,6 +1,6 @@
 # BlackCrow Deployment
 
-BlackCrow is ready to deploy as one Node web service. The Node server serves both the static frontend and the `/api` routes.
+BlackCrow can deploy either as one Node web service or through Vercel serverless functions. The Node server serves both the static frontend and the `/api` routes locally; Vercel uses `api/[...path].js` as the serverless adapter.
 
 ## Required Production Values
 
@@ -52,6 +52,27 @@ https://yourdomain.com/api/payments/paystack/webhook
 ## Render Blueprint
 
 `render.yaml` is included for Render. It creates a Node web service and marks secrets as dashboard-managed values.
+
+## Vercel
+
+`vercel.json` is included for Vercel. Configure the same production environment variables in the Vercel project settings.
+
+Use:
+
+```text
+Build command: npm run check
+Output directory: leave empty/default
+Install command: npm install
+```
+
+After deployment, set:
+
+```text
+PUBLIC_APP_URL=https://your-vercel-domain.vercel.app
+ALLOWED_ORIGINS=https://your-vercel-domain.vercel.app
+```
+
+For a custom domain, change both values to the custom domain.
 
 ## Local Verification
 

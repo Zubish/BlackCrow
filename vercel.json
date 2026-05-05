@@ -1,0 +1,15 @@
+{
+  "buildCommand": "npm run check",
+  "functions": {
+    "api/[...path].js": {
+      "includeFiles": "backend/schema.sql",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/landingpage.html"
+    }
+  ]
+}

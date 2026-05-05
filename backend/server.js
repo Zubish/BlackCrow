@@ -22,6 +22,7 @@ const OTP_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const OTP_RATE_LIMIT_MAX = 5;
 let storage;
 let paymentProvider;
+let runtimeReady;
 const otpRateLimits = new Map();
 
 function loadEnv() {
@@ -1041,10 +1042,20 @@ async function handleRequest(request, response) {
     }
 }
 
+async function initializeRuntime() {
+    if (!runtimeReady) {
+        runtimeReady = (async () => {
+            validateProductionConfig();
+            storage = await createStorage();
+            paymentProvider = createPaymentProvider();
+            return { storage, paymentProvider };
+        })();
+    }
+    return runtimeReady;
+}
+
 async function startServer() {
-    validateProductionConfig();
-    storage = await createStorage();
-    paymentProvider = createPaymentProvider();
+    await initializeRuntime();
     http.createServer(handleRequest).listen(PORT, () => {
         console.log(`BlackCrow API listening on http://127.0.0.1:${PORT}`);
         console.log(`Storage mode: ${storage.mode}`);
@@ -1052,7 +1063,16 @@ async function startServer() {
     });
 }
 
-startServer().catch((error) => {
-    console.error(error.message || error);
-    process.exit(1);
-});
+async function serverlessHandler(request, response) {
+    await initializeRuntime();
+    return handleRequest(request, response);
+}
+
+if (require.main === module) {
+    startServer().catch((error) => {
+        console.error(error.message || error);
+        process.exit(1);
+    });
+}
+
+module.exports = { handleRequest: serverlessHandler, initializeRuntime };
