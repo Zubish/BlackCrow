@@ -3,41 +3,88 @@ const defaultTransactions = [
         id: "BC-2401",
         buyer: "Kite Retail Group",
         seller: "Nova Supply Co.",
+        buyerEmail: "buyer@kite.test",
+        sellerEmail: "seller@nova.test",
         amount: 12800,
         status: "pending",
         condition: "Delivery confirmation",
         inspectionDays: 5,
         note: "Release after serial verification and signed handoff.",
+        lifecycle: {
+            buyerAccepted: false,
+            sellerAccepted: false,
+            paymentInitialized: false,
+            paymentConfirmed: false,
+            withdrawalRequested: false,
+            funded: false,
+            delivered: false,
+            released: false,
+            withdrawn: false
+        },
         updatedAt: "2 hours ago"
     },
     {
         id: "BC-2398",
         buyer: "Atlas Commerce",
         seller: "Delta Freight Hub",
+        buyerEmail: "buyer@atlas.test",
+        sellerEmail: "seller@delta.test",
         amount: 4200,
         status: "review",
         condition: "Document verification",
         inspectionDays: 3,
         note: "Review customs documents before settlement.",
+        lifecycle: {
+            buyerAccepted: true,
+            sellerAccepted: true,
+            paymentInitialized: true,
+            paymentConfirmed: true,
+            withdrawalRequested: false,
+            funded: true,
+            delivered: false,
+            released: false,
+            withdrawn: false
+        },
         updatedAt: "6 hours ago"
     },
     {
         id: "BC-2387",
         buyer: "Eastline Studio",
         seller: "Foundry Digital",
+        buyerEmail: "buyer@eastline.test",
+        sellerEmail: "seller@foundry.test",
         amount: 9600,
         status: "completed",
         condition: "Milestone approval",
         inspectionDays: 7,
         note: "Final release approved after source delivery.",
+        lifecycle: {
+            buyerAccepted: true,
+            sellerAccepted: true,
+            paymentInitialized: true,
+            paymentConfirmed: true,
+            withdrawalRequested: false,
+            funded: true,
+            delivered: true,
+            released: true,
+            withdrawn: false
+        },
         updatedAt: "Yesterday"
     }
 ];
+
+const API_BASE = window.BLACKCROW_API_BASE
+    || (window.location.protocol === "file:" ? "http://127.0.0.1:5000/api" : "/api");
 
 const state = {
     filter: "all",
     query: "",
     walletVisible: false,
+    backendOnline: false,
+    currentUser: loadAuthUser(),
+    walletBalanceValue: null,
+    activityEvents: [],
+    trackingSession: null,
     transactions: loadTransactions()
 };
 
@@ -61,6 +108,7 @@ const elements = {
     trackForm: document.getElementById("track-form"),
     trackEscrowId: document.getElementById("track-escrow-id"),
     trackEmail: document.getElementById("track-email"),
+    trackCode: document.getElementById("track-code"),
     trackingPanel: document.getElementById("tracking-panel"),
     trackingSummary: document.getElementById("tracking-summary"),
     trackingActions: document.getElementById("tracking-actions"),
@@ -73,6 +121,14 @@ const elements = {
     statPending: document.getElementById("stat-pending"),
     statReview: document.getElementById("stat-review"),
     statCompleted: document.getElementById("stat-completed"),
+    loginForm: document.getElementById("login-form"),
+    signupForm: document.getElementById("signup-form"),
+    loginIdentifier: document.getElementById("login-identifier"),
+    loginPassword: document.getElementById("login-password"),
+    signupName: document.getElementById("signup-name"),
+    signupEmail: document.getElementById("signup-email"),
+    signupPassword: document.getElementById("signup-password"),
+    signupConfirmPassword: document.getElementById("signup-confirm-password"),
     toast: document.getElementById("toast")
 };
 
@@ -95,6 +151,197 @@ function saveTransactions() {
     window.localStorage.setItem("blackcrow-transactions", JSON.stringify(state.transactions));
 }
 
+function loadAuthUser() {
+    try {
+        const saved = window.localStorage.getItem("blackcrow-auth-user");
+        return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function getAuthToken() {
+    return window.localStorage.getItem("blackcrow-auth-token") || "";
+}
+
+function saveAuthSession(user, token) {
+    window.localStorage.setItem("blackcrow-auth-user", JSON.stringify(user));
+    window.localStorage.setItem("blackcrow-auth-token", token);
+    state.currentUser = user;
+}
+
+function clearAuthSession() {
+    window.localStorage.removeItem("blackcrow-auth-user");
+    window.localStorage.removeItem("blackcrow-auth-token");
+    state.currentUser = null;
+}
+
+function isDashboardPage() {
+    return document.body.classList.contains("dashboard-page");
+}
+
+async function apiRequest(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, {
+        method: options.method || "GET",
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.auth ? { Authorization: `Bearer ${getAuthToken()}` } : {})
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(data.error || "Backend request failed.");
+    }
+    return data;
+}
+
+function isNetworkError(error) {
+    return error instanceof TypeError || error.message === "Failed to fetch";
+}
+
+function mapEscrow(escrow) {
+    return {
+        ...escrow,
+        lifecycle: normalizeLifecycle(escrow.lifecycle),
+        shareLink: createTrackingLink(escrow.id),
+        updatedAt: formatTimestamp(escrow.updatedAt)
+    };
+}
+
+function formatTimestamp(value) {
+    if (!value) return "Just now";
+    if (!Number.isNaN(Date.parse(value))) {
+        return new Intl.DateTimeFormat("en-NG", {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        }).format(new Date(value));
+    }
+    return value;
+}
+
+async function refreshTransactionsFromBackend() {
+    if (!isDashboardPage()) return;
+
+    const data = await apiRequest("/account/escrows", { auth: true });
+    state.transactions = data.escrows.map(mapEscrow);
+    state.backendOnline = true;
+    saveTransactions();
+    renderAll();
+}
+
+async function verifySavedSession() {
+    const token = getAuthToken();
+    if (!token) return null;
+
+    const data = await apiRequest("/auth/me", { auth: true });
+    saveAuthSession(data.user, token);
+    return data.user;
+}
+
+async function loadAccountWallet() {
+    if (!isDashboardPage() || !getAuthToken()) return;
+
+    const data = await apiRequest("/account/wallet", { auth: true });
+    state.walletBalanceValue = Number(data.availableBalance || 0);
+    renderStats();
+}
+
+async function loadAccountActivity() {
+    if (!isDashboardPage() || !getAuthToken()) return;
+
+    const data = await apiRequest("/account/activity", { auth: true });
+    state.activityEvents = Array.isArray(data.events) ? data.events : [];
+    renderActivity();
+}
+
+async function bootAuthState() {
+    if (!isDashboardPage()) return true;
+
+    const token = getAuthToken();
+    if (!token) {
+        window.location.href = "login.html";
+        return false;
+    }
+
+    try {
+        await verifySavedSession();
+        hydrateUserFields();
+        return true;
+    } catch (error) {
+        clearAuthSession();
+        window.location.href = "login.html";
+        return false;
+    }
+}
+
+function hydrateUserFields() {
+    const user = state.currentUser;
+    if (!user) return;
+
+    const initiatorEmail = document.getElementById("initiator-email");
+    if (initiatorEmail && !initiatorEmail.value) {
+        initiatorEmail.value = user.email;
+    }
+
+    const profileItems = Array.from(document.querySelectorAll(".profile-menu-list a"));
+    const profileLink = profileItems.find((item) => item.textContent.trim().toLowerCase() === "profile");
+    if (profileLink) {
+        profileLink.textContent = user.fullName || user.email;
+    }
+}
+
+async function createEscrowOnBackend(payload, options = {}) {
+    const data = await apiRequest(options.auth ? "/account/escrows" : "/escrows", {
+        method: "POST",
+        auth: Boolean(options.auth),
+        body: payload
+    });
+    const escrow = mapEscrow(data.escrow);
+    state.transactions = [escrow, ...state.transactions.filter((item) => item.id !== escrow.id)];
+    state.backendOnline = true;
+    saveTransactions();
+    return escrow;
+}
+
+function addLocalEscrow(payload) {
+    const nextId = createEscrowId();
+    const counterpartyRole = payload.initiatorRole === "seller" ? "buyer" : "seller";
+    const transaction = {
+        id: nextId,
+        seller: payload.seller,
+        buyer: payload.buyer,
+        buyerEmail: payload.buyerEmail,
+        sellerEmail: payload.sellerEmail,
+        amount: Number(payload.amount),
+        status: "pending",
+        condition: payload.condition,
+        inspectionDays: Number(payload.inspectionDays || 5),
+        item: payload.item,
+        note: `Awaiting ${counterpartyRole} acceptance and buyer funding.`,
+        initiatorRole: payload.initiatorRole,
+        lifecycle: {
+            buyerAccepted: false,
+            sellerAccepted: false,
+            paymentInitialized: false,
+            paymentConfirmed: false,
+            withdrawalRequested: false,
+            funded: false,
+            delivered: false,
+            released: false,
+            withdrawn: false
+        },
+        shareLink: createTrackingLink(nextId),
+        updatedAt: "Just now"
+    };
+
+    state.transactions.unshift(transaction);
+    saveTransactions();
+    return transaction;
+}
+
 function createTrackingLink(id) {
     const url = new URL("track-escrow.html", window.location.href);
     url.searchParams.set("id", id);
@@ -109,6 +356,9 @@ function normalizeLifecycle(lifecycle = {}) {
     return {
         buyerAccepted: Boolean(lifecycle.buyerAccepted || lifecycle.accepted),
         sellerAccepted: Boolean(lifecycle.sellerAccepted || lifecycle.accepted),
+        paymentInitialized: Boolean(lifecycle.paymentInitialized),
+        paymentConfirmed: Boolean(lifecycle.paymentConfirmed),
+        withdrawalRequested: Boolean(lifecycle.withdrawalRequested),
         funded: Boolean(lifecycle.funded),
         delivered: Boolean(lifecycle.delivered),
         released: Boolean(lifecycle.released),
@@ -132,8 +382,13 @@ function renderStats() {
     const completed = state.transactions.filter((item) => item.status === "completed").length;
     const volume = state.transactions.reduce((sum, item) => sum + item.amount, 0);
     const walletBalance = state.transactions
-        .filter((item) => item.status === "completed" && !item.lifecycle?.withdrawn)
+        .filter((item) => (
+            item.status === "completed"
+            && !item.lifecycle?.withdrawn
+            && !item.lifecycle?.withdrawalRequested
+        ))
         .reduce((sum, item) => sum + item.amount, 0);
+    const displayWalletBalance = state.walletBalanceValue ?? walletBalance;
     const completion = total ? Math.round((completed / total) * 100) : 0;
 
     setText(elements.statTotal, total);
@@ -142,8 +397,8 @@ function renderStats() {
     setText(elements.statCompleted, completed);
     setText(elements.protectedVolume, currency.format(volume));
     setText(elements.completionRate, `${completion}%`);
-    setText(elements.walletSectionBalance, currency.format(walletBalance));
-    setText(elements.walletBalance, state.walletVisible ? currency.format(walletBalance) : "₦--");
+    setText(elements.walletSectionBalance, currency.format(displayWalletBalance));
+    setText(elements.walletBalance, state.walletVisible ? currency.format(displayWalletBalance) : "₦--");
 }
 
 function renderTransactions() {
@@ -202,6 +457,20 @@ function renderTransactions() {
 
 function renderActivity() {
     if (!elements.activityFeed) return;
+
+    if (state.activityEvents.length) {
+        elements.activityFeed.innerHTML = state.activityEvents.slice(0, 5).map((event, index) => `
+            <article class="activity-item">
+                <div class="activity-mark">0${index + 1}</div>
+                <div class="activity-copy">
+                    <strong>${escapeHtml(event.escrowId)} ${escapeHtml(event.type.replace("escrow.", ""))}</strong>
+                    <span>${escapeHtml(event.message)}</span>
+                </div>
+                <span class="micro-copy">${escapeHtml(formatTimestamp(event.createdAt))}</span>
+            </article>
+        `).join("");
+        return;
+    }
 
     const ordered = [...state.transactions].slice(0, 5);
 
@@ -318,8 +587,19 @@ function bindProfileMenu() {
         elements.profileTrigger.setAttribute("aria-expanded", "false");
     });
 
-    elements.sidebarLogout?.addEventListener("click", () => {
+    const logout = () => {
+        clearAuthSession();
         window.location.href = "landingpage.html";
+    };
+
+    elements.sidebarLogout?.addEventListener("click", logout);
+    Array.from(document.querySelectorAll(".profile-menu-list a")).forEach((link) => {
+        if (link.textContent.trim().toLowerCase() === "logout") {
+            link.addEventListener("click", (event) => {
+                event.preventDefault();
+                logout();
+            });
+        }
     });
 }
 
@@ -337,6 +617,61 @@ function bindWalletBalance() {
             state.walletVisible ? "Hide wallet balance" : "Show wallet balance"
         );
         renderStats();
+    });
+}
+
+function bindAuthForms() {
+    elements.loginForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const email = elements.loginIdentifier.value.trim().toLowerCase();
+        const password = elements.loginPassword.value;
+
+        try {
+            const data = await apiRequest("/auth/login", {
+                method: "POST",
+                body: { email, password }
+            });
+            saveAuthSession(data.user, data.token);
+            window.location.href = "overview.html";
+        } catch (error) {
+            showToast(error.message);
+        }
+    });
+
+    elements.signupForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const password = elements.signupPassword.value;
+        const confirmPassword = elements.signupConfirmPassword.value;
+        if (password !== confirmPassword) {
+            elements.signupConfirmPassword.setCustomValidity("Passwords must match.");
+            elements.signupConfirmPassword.reportValidity();
+            return;
+        }
+
+        elements.signupConfirmPassword.setCustomValidity("");
+
+        try {
+            const data = await apiRequest("/auth/signup", {
+                method: "POST",
+                body: {
+                    fullName: elements.signupName.value.trim(),
+                    email: elements.signupEmail.value.trim().toLowerCase(),
+                    password
+                }
+            });
+            saveAuthSession(data.user, data.token);
+            window.location.href = "overview.html";
+        } catch (error) {
+            showToast(error.message);
+        }
+    });
+
+    [elements.signupPassword, elements.signupConfirmPassword].forEach((input) => {
+        input?.addEventListener("input", () => {
+            elements.signupConfirmPassword?.setCustomValidity("");
+        });
     });
 }
 
@@ -367,57 +702,58 @@ function bindTransactionActions() {
 function bindForm() {
     if (!elements.form) return;
 
-    elements.form.addEventListener("submit", (event) => {
+    elements.form.addEventListener("submit", async (event) => {
         event.preventDefault();
 
         const formData = new FormData(elements.form);
-        const nextId = createEscrowId();
         const initiatorRole = formData.get("initiatorRole");
         const initiatorEmail = formData.get("initiatorEmail").trim().toLowerCase();
         const otherParty = formData.get("otherParty").trim();
         const otherPartyEmail = formData.get("otherPartyEmail").trim().toLowerCase();
         const itemDescription = formData.get("itemDescription").trim();
-        const buyer = initiatorRole === "buyer" ? "You" : otherParty;
-        const seller = initiatorRole === "seller" ? "You" : otherParty;
+        const currentUserName = state.currentUser?.fullName || "You";
+        const buyer = initiatorRole === "buyer" ? currentUserName : otherParty;
+        const seller = initiatorRole === "seller" ? currentUserName : otherParty;
         const buyerEmail = initiatorRole === "buyer" ? initiatorEmail : otherPartyEmail;
         const sellerEmail = initiatorRole === "seller" ? initiatorEmail : otherPartyEmail;
-        const counterpartyRole = initiatorRole === "seller" ? "buyer" : "seller";
-        const shareLink = createTrackingLink(nextId);
-
-        state.transactions.unshift({
-            id: nextId,
-            seller,
+        const payload = {
             buyer,
+            seller,
             buyerEmail,
             sellerEmail,
             amount: Number(formData.get("amount")),
-            status: "pending",
             condition: formData.get("releaseCondition"),
             inspectionDays: 5,
             item: itemDescription,
-            note: `Awaiting ${counterpartyRole} acceptance and buyer funding.`,
-            initiatorRole,
-            lifecycle: {
-                buyerAccepted: false,
-                sellerAccepted: false,
-                funded: false,
-                delivered: false,
-                released: false,
-                withdrawn: false
-            },
-            shareLink,
-            updatedAt: "Just now"
-        });
+            initiatorRole
+        };
+
+        let transaction;
+        try {
+            transaction = await createEscrowOnBackend(payload, { auth: true });
+        } catch (error) {
+            state.backendOnline = false;
+            if (!isNetworkError(error)) {
+                showToast(error.message);
+                return;
+            }
+            if (getAuthToken()) {
+                showToast("Backend is offline. Account escrows need the backend.");
+                return;
+            }
+            transaction = addLocalEscrow(payload);
+        }
 
         saveTransactions();
         elements.form.reset();
         elements.form.querySelector("[name='initiatorRole'][value='seller']").checked = true;
+        hydrateUserFields();
         if (elements.escrowLinkInput && elements.escrowLinkPanel) {
-            elements.escrowLinkInput.value = shareLink;
+            elements.escrowLinkInput.value = transaction.shareLink;
             elements.escrowLinkPanel.hidden = false;
         }
         renderAll();
-        showToast(`Escrow link ${nextId} created.`);
+        showToast(`Escrow link ${transaction.id} created.`);
         document.getElementById("transactions")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
@@ -440,11 +776,10 @@ function bindEscrowLinkCopy() {
 function bindGuestEscrowForm() {
     if (!elements.guestForm) return;
 
-    elements.guestForm.addEventListener("submit", (event) => {
+    elements.guestForm.addEventListener("submit", async (event) => {
         event.preventDefault();
 
         const formData = new FormData(elements.guestForm);
-        const nextId = createEscrowId();
         const initiatorRole = formData.get("initiatorRole");
         const initiatorName = formData.get("initiatorName").trim();
         const initiatorEmail = formData.get("initiatorEmail").trim().toLowerCase();
@@ -454,42 +789,39 @@ function bindGuestEscrowForm() {
         const seller = initiatorRole === "seller" ? initiatorName : otherPartyName;
         const buyerEmail = initiatorRole === "buyer" ? initiatorEmail : otherPartyEmail;
         const sellerEmail = initiatorRole === "seller" ? initiatorEmail : otherPartyEmail;
-        const shareLink = createTrackingLink(nextId);
-
-        state.transactions.unshift({
-            id: nextId,
+        const payload = {
             buyer,
             seller,
             buyerEmail,
             sellerEmail,
             amount: Number(formData.get("amount")),
-            status: "pending",
             condition: formData.get("releaseCondition"),
             inspectionDays: 5,
             item: formData.get("itemDescription").trim(),
-            note: "Awaiting counterparty acceptance and buyer funding.",
-            initiatorRole,
-            lifecycle: {
-                buyerAccepted: false,
-                sellerAccepted: false,
-                funded: false,
-                delivered: false,
-                released: false,
-                withdrawn: false
-            },
-            shareLink,
-            updatedAt: "Just now"
-        });
+            initiatorRole
+        };
+
+        let transaction;
+        try {
+            transaction = await createEscrowOnBackend(payload);
+        } catch (error) {
+            state.backendOnline = false;
+            if (!isNetworkError(error)) {
+                showToast(error.message);
+                return;
+            }
+            transaction = addLocalEscrow(payload);
+        }
 
         saveTransactions();
         elements.guestForm.reset();
         elements.guestForm.querySelector("[name='initiatorRole'][value='seller']").checked = true;
         if (elements.escrowLinkInput && elements.escrowLinkPanel) {
-            elements.escrowLinkInput.value = shareLink;
+            elements.escrowLinkInput.value = transaction.shareLink;
             elements.escrowLinkPanel.hidden = false;
         }
         renderAll();
-        showToast(`One-off escrow ${nextId} created.`);
+        showToast(`One-off escrow ${transaction.id} created.`);
     });
 }
 
@@ -501,17 +833,66 @@ function bindTracking() {
         elements.trackEscrowId.value = idFromUrl.toUpperCase();
     }
 
-    elements.trackForm.addEventListener("submit", (event) => {
+    elements.trackForm.addEventListener("submit", async (event) => {
         event.preventDefault();
-        renderTracking();
+        await openTrackedEscrow();
     });
 
-    elements.trackingActions?.addEventListener("click", (event) => {
+    elements.trackingActions?.addEventListener("click", async (event) => {
         const button = event.target.closest("[data-track-action]");
         if (!button) return;
 
-        updateTrackedEscrow(button.dataset.trackAction);
+        await updateTrackedEscrow(button.dataset.trackAction);
     });
+}
+
+async function openTrackedEscrow() {
+    const id = elements.trackEscrowId.value.trim().toUpperCase();
+    const email = elements.trackEmail.value.trim().toLowerCase();
+    const code = elements.trackCode?.value.trim();
+
+    if (!id || !email) return;
+
+    try {
+        if (!code) {
+            const data = await apiRequest(`/escrows/${encodeURIComponent(id)}/otp`, {
+                method: "POST",
+                body: { email }
+            });
+            state.backendOnline = true;
+            if (elements.trackCode && data.devCode) {
+                elements.trackCode.value = data.devCode;
+            }
+            showToast(data.devCode ? `Access code generated: ${data.devCode}` : "Access code sent.");
+            return;
+        }
+
+        const data = await apiRequest(`/escrows/${encodeURIComponent(id)}/otp/verify`, {
+            method: "POST",
+            body: { email, code }
+        });
+        const transaction = mapEscrow(data.escrow);
+        state.trackingSession = {
+            id: transaction.id,
+            email,
+            role: data.role,
+            token: data.token
+        };
+        state.transactions = [transaction, ...state.transactions.filter((item) => item.id !== transaction.id)];
+        state.backendOnline = true;
+        saveTransactions();
+        renderAll();
+        renderTracking();
+        showToast("Escrow access verified.");
+    } catch (error) {
+        state.backendOnline = false;
+        state.trackingSession = null;
+        if (isNetworkError(error)) {
+            renderTracking();
+        } else {
+            renderTracking(error.message);
+        }
+    }
 }
 
 function getTrackedContext() {
@@ -521,18 +902,26 @@ function getTrackedContext() {
 
     if (!transaction) return { error: "No escrow found for that ID." };
 
+    if (state.trackingSession?.id === transaction.id && state.trackingSession.email === email) {
+        return {
+            transaction,
+            role: state.trackingSession.role,
+            token: state.trackingSession.token
+        };
+    }
+
     const role = email === transaction.buyerEmail ? "buyer" : email === transaction.sellerEmail ? "seller" : "";
     if (!role) return { error: "Use the buyer or seller email attached to this escrow." };
 
     return { transaction, role };
 }
 
-function renderTracking() {
+function renderTracking(errorMessage = "") {
     const context = getTrackedContext();
 
-    if (context.error) {
+    if (errorMessage || context.error) {
         elements.trackingPanel.hidden = false;
-        elements.trackingSummary.innerHTML = `<div class="empty-state">${escapeHtml(context.error)}</div>`;
+        elements.trackingSummary.innerHTML = `<div class="empty-state">${escapeHtml(errorMessage || context.error)}</div>`;
         elements.trackingActions.innerHTML = "";
         return;
     }
@@ -542,9 +931,11 @@ function renderTracking() {
     const steps = [
         ["Buyer accepted", lifecycle.buyerAccepted],
         ["Seller accepted", lifecycle.sellerAccepted],
-        ["Buyer funded", lifecycle.funded],
+        ["Payment initialized", lifecycle.paymentInitialized],
+        ["Funding confirmed", lifecycle.paymentConfirmed],
         ["Seller delivered", lifecycle.delivered],
         ["Buyer released", lifecycle.released],
+        ["Withdrawal requested", lifecycle.withdrawalRequested],
         ["Seller withdrawn", lifecycle.withdrawn]
     ];
 
@@ -578,8 +969,16 @@ function getTrackingActions(transaction, role) {
         return `<div class="empty-state">Waiting for the other party to accept the escrow terms.</div>`;
     }
 
-    if (role === "buyer" && !lifecycle.funded) {
-        return `<button class="primary-button" type="button" data-track-action="fund">Mark payment funded</button>`;
+    if (role === "buyer" && !lifecycle.paymentInitialized) {
+        return `<button class="primary-button" type="button" data-track-action="initialize-payment">Initialize simulated payment</button>`;
+    }
+
+    if (role === "buyer" && lifecycle.paymentInitialized && !lifecycle.funded) {
+        return `<button class="primary-button" type="button" data-track-action="confirm-funding">Confirm simulated funding</button>`;
+    }
+
+    if (role === "seller" && !lifecycle.funded) {
+        return `<div class="empty-state">Waiting for buyer to initialize and confirm payment.</div>`;
     }
 
     if (role === "seller" && lifecycle.funded && !lifecycle.delivered) {
@@ -590,16 +989,101 @@ function getTrackingActions(transaction, role) {
         return `<button class="primary-button" type="button" data-track-action="release">Release funds to seller wallet</button>`;
     }
 
-    if (role === "seller" && lifecycle.released && !lifecycle.withdrawn) {
-        return `<button class="primary-button" type="button" data-track-action="withdraw">Withdraw to local bank</button>`;
+    if (role === "seller" && lifecycle.released && !lifecycle.withdrawalRequested && !lifecycle.withdrawn) {
+        return `
+            <form class="composer-form compact-action-form" id="withdrawal-form">
+                <label>
+                    Bank name
+                    <input type="text" id="withdraw-bank-name" placeholder="Bank name" required>
+                </label>
+                <label>
+                    Account name
+                    <input type="text" id="withdraw-account-name" placeholder="Account holder name" required>
+                </label>
+                <label>
+                    Account number
+                    <input type="text" id="withdraw-account-number" inputmode="numeric" placeholder="Account number" required>
+                </label>
+                <button class="primary-button" type="button" data-track-action="request-withdrawal">Request withdrawal</button>
+            </form>
+        `;
+    }
+
+    if (role === "seller" && lifecycle.withdrawalRequested && !lifecycle.withdrawn) {
+        return `<div class="empty-state">Withdrawal request received. BlackCrow will mark it paid after bank payout is completed.</div>`;
     }
 
     return `<div class="empty-state">No action is needed from you right now.</div>`;
 }
 
-function updateTrackedEscrow(action) {
+function getWithdrawalDestination() {
+    return {
+        bankName: document.getElementById("withdraw-bank-name")?.value.trim() || "",
+        accountName: document.getElementById("withdraw-account-name")?.value.trim() || "",
+        accountNumber: document.getElementById("withdraw-account-number")?.value.replace(/\D/g, "") || ""
+    };
+}
+
+function hasValidWithdrawalDestination(destination) {
+    return destination.bankName && destination.accountName && destination.accountNumber.length >= 8;
+}
+
+async function updateTrackedEscrow(action) {
     const context = getTrackedContext();
     if (context.error) return;
+
+    if (context.token) {
+        try {
+            let data;
+            if (action === "initialize-payment") {
+                data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/payments/initialize`, {
+                    method: "POST",
+                    body: { token: context.token }
+                });
+            } else if (action === "confirm-funding") {
+                data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/payments/verify`, {
+                    method: "POST",
+                    body: { token: context.token }
+                });
+            } else if (action === "request-withdrawal") {
+                const payoutDestination = getWithdrawalDestination();
+                if (!hasValidWithdrawalDestination(payoutDestination)) {
+                    showToast("Add valid bank details before requesting withdrawal.");
+                    return;
+                }
+                data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/withdrawals`, {
+                    method: "POST",
+                    body: {
+                        token: context.token,
+                        payoutDestination
+                    }
+                });
+            } else {
+                data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/actions`, {
+                    method: "PATCH",
+                    body: {
+                        token: context.token,
+                        action
+                    }
+                });
+            }
+            const transaction = mapEscrow(data.escrow);
+            state.transactions = [transaction, ...state.transactions.filter((item) => item.id !== transaction.id)];
+            state.trackingSession = {
+                ...state.trackingSession,
+                role: data.role || state.trackingSession.role
+            };
+            state.backendOnline = true;
+            saveTransactions();
+            renderAll();
+            renderTracking();
+            showToast("Escrow updated.");
+            return;
+        } catch (error) {
+            renderTracking(error.message);
+            return;
+        }
+    }
 
     state.transactions = state.transactions.map((transaction) => {
         if (transaction.id !== context.transaction.id) return transaction;
@@ -618,10 +1102,16 @@ function updateTrackedEscrow(action) {
                 ? "Both parties accepted. Waiting for buyer funding."
                 : "Terms accepted. Waiting for the other party.";
         }
-        if (action === "fund") {
+        if (action === "initialize-payment") {
+            lifecycle.paymentInitialized = true;
+            note = "Simulated payment initialized. Waiting for funding confirmation.";
+        }
+        if (action === "confirm-funding") {
+            lifecycle.paymentInitialized = true;
+            lifecycle.paymentConfirmed = true;
             lifecycle.funded = true;
             status = "review";
-            note = "Buyer funded escrow. Waiting for seller delivery.";
+            note = "Buyer funding confirmed. Waiting for seller delivery.";
         }
         if (action === "deliver") {
             lifecycle.delivered = true;
@@ -633,10 +1123,15 @@ function updateTrackedEscrow(action) {
             status = "completed";
             note = "Buyer released funds to seller wallet.";
         }
-        if (action === "withdraw") {
-            lifecycle.withdrawn = true;
+        if (action === "request-withdrawal") {
+            const destination = getWithdrawalDestination();
+            if (!hasValidWithdrawalDestination(destination)) {
+                showToast("Add valid bank details before requesting withdrawal.");
+                return transaction;
+            }
+            lifecycle.withdrawalRequested = true;
             status = "completed";
-            note = "Seller withdrew released funds to local bank.";
+            note = "Seller requested payout to local bank. Withdrawal is pending.";
         }
 
         return { ...transaction, lifecycle, status, note, updatedAt: "Just now" };
@@ -652,10 +1147,15 @@ async function probeBackend() {
     if (!elements.connectionPill || !elements.connectionLabel) return;
 
     try {
-        await fetch("http://127.0.0.1:5000", { method: "GET" });
+        await apiRequest("/health");
+        await refreshTransactionsFromBackend();
+        await loadAccountWallet();
+        await loadAccountActivity();
+        state.backendOnline = true;
         elements.connectionPill.classList.add("online");
         elements.connectionLabel.textContent = "Backend reachable";
     } catch (error) {
+        state.backendOnline = false;
         elements.connectionPill.classList.remove("online");
         elements.connectionLabel.textContent = "Frontend-only mode";
     }
@@ -667,15 +1167,23 @@ function renderAll() {
     renderActivity();
 }
 
-bindFilters();
-bindSearch();
-bindNavigation();
-bindProfileMenu();
-bindWalletBalance();
-bindTransactionActions();
-bindForm();
-bindGuestEscrowForm();
-bindEscrowLinkCopy();
-bindTracking();
-renderAll();
-probeBackend();
+async function initializeApp() {
+    const canContinue = await bootAuthState();
+    if (!canContinue) return;
+    bindFilters();
+    bindSearch();
+    bindNavigation();
+    bindProfileMenu();
+    bindWalletBalance();
+    bindAuthForms();
+    bindTransactionActions();
+    bindForm();
+    bindGuestEscrowForm();
+    bindEscrowLinkCopy();
+    bindTracking();
+    hydrateUserFields();
+    renderAll();
+    probeBackend();
+}
+
+initializeApp();

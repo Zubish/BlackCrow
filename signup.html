@@ -77,27 +77,7 @@
             <p class="auth-link">Already have an account? <a href="login.html">Log In</a></p>
         </form>
     </div>
-    <script>
-        document.getElementById("signup-form").addEventListener("submit", (event) => {
-            event.preventDefault();
-            const password = document.getElementById("signup-password");
-            const confirmPassword = document.getElementById("signup-confirm-password");
-
-            if (password.value !== confirmPassword.value) {
-                confirmPassword.setCustomValidity("Passwords must match.");
-                confirmPassword.reportValidity();
-                return;
-            }
-
-            confirmPassword.setCustomValidity("");
-            window.location.href = "overview.html";
-        });
-
-        ["signup-password", "signup-confirm-password"].forEach((id) => {
-            document.getElementById(id).addEventListener("input", () => {
-                document.getElementById("signup-confirm-password").setCustomValidity("");
-            });
-        });
-    </script>
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <script src="./script.js"></script>
 </body>
 </html>

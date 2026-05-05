@@ -37,8 +37,8 @@
                 </div>
             </div>
             <p class="guest-lead">
-                Enter the escrow ID and the buyer or seller email attached to the transaction. Each party only sees the
-                actions that apply to them.
+                Enter the escrow ID and the buyer or seller email attached to the transaction. BlackCrow generates a
+                short access code before unlocking the actions that apply to you.
             </p>
 
             <form class="composer-form" id="track-form">
@@ -49,6 +49,10 @@
                 <label>
                     Your email
                     <input type="email" id="track-email" placeholder="you@email.com" required>
+                </label>
+                <label>
+                    Access code
+                    <input type="text" id="track-code" inputmode="numeric" placeholder="Request code first">
                 </label>
                 <button class="primary-button" type="submit">Open escrow</button>
             </form>
@@ -62,7 +66,7 @@
         <section class="guest-side">
             <article class="feature-card">
                 <h3>Buyer actions</h3>
-                <p>Accept terms, fund escrow, and release funds after the delivery condition is met.</p>
+                <p>Accept terms, initialize simulated payment, confirm funding, and release funds after delivery.</p>
             </article>
             <article class="feature-card">
                 <h3>Seller actions</h3>

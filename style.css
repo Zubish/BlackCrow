@@ -26,6 +26,7 @@ html {
 body {
     margin: 0;
     min-height: 100vh;
+    overflow-x: hidden;
     font-family: "Manrope", sans-serif;
     background:
         radial-gradient(circle at top left, rgba(240, 179, 90, 0.16), transparent 22rem),
@@ -438,6 +439,10 @@ body::before {
 
 .section-heading {
     margin-bottom: 1rem;
+}
+
+.section-heading > div {
+    min-width: 0;
 }
 
 .section-heading h3 {
@@ -1066,18 +1071,23 @@ body::before {
     border-radius: 1.25rem;
     background: var(--panel);
     box-shadow: var(--shadow);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .guest-card h2 {
     margin: 0;
     font-size: clamp(2rem, 4vw, 3.2rem);
     line-height: 1.05;
+    overflow-wrap: anywhere;
 }
 
 .guest-lead {
     margin: 0;
     color: #dce6f0;
     line-height: 1.65;
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 
 .tracking-panel {
@@ -1116,6 +1126,12 @@ body::before {
     gap: 0.55rem;
 }
 
+.compact-action-form {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: end;
+}
+
 .status-list span {
     min-height: 2rem;
     display: inline-flex;
@@ -1135,6 +1151,12 @@ body::before {
 .landing-page .hero-actions .primary-button,
 .tracking-panel .primary-button {
     width: auto;
+}
+
+@media (max-width: 760px) {
+    .compact-action-form {
+        grid-template-columns: 1fr;
+    }
 }
 
 .testimonials-grid {
@@ -1613,9 +1635,28 @@ body::before {
     .search-shell,
     .wallet-pill,
     .hero-actions,
-    .guest-shell,
     .primary-button {
         width: 100%;
+    }
+
+    .guest-shell {
+        width: calc(100% - 2rem);
+    }
+
+    .guest-card {
+        padding: 1rem;
+        width: calc(100vw - 2rem);
+        max-width: 100%;
+    }
+
+    .guest-card h2 {
+        font-size: clamp(1.55rem, 7vw, 2rem);
+        line-height: 1.12;
+        width: min(100%, 20rem);
+    }
+
+    .guest-lead {
+        width: min(100%, 20rem);
     }
 
     .wallet-section strong {

@@ -1,184 +1,143 @@
-# 🛡️ Blackcrow Escrow – Trust Layer for Social Commerce
+# BlackCrow Escrow
 
-## 🚨 Problem
+BlackCrow is an escrow web app for social-commerce transactions. A buyer or seller can create a protected transaction link, both parties accept the terms, the buyer funds escrow, the seller delivers, the buyer releases funds, and the seller requests payout to a local bank.
 
-Buying and selling on platforms like WhatsApp, Instagram, and Twitter comes with a major issue:
+## Current Scope
 
-> **Lack of trust between buyers and sellers**
+- Public landing page and one-off escrow creation.
+- Account signup, login, and dashboard pages.
+- Email OTP access for guest escrow tracking.
+- Neon/Postgres persistence through the Node backend.
+- Simulated payment boundary with Paystack-ready provider wiring.
+- Seller wallet and withdrawal request boundary.
+- Static frontend served by the same Node service.
 
-- Buyers fear getting scammed after payment
-- Sellers fear chargebacks or fake claims
-- No structured transaction protection exists
+## Core Flow
 
----
+1. Buyer or seller creates an escrow link.
+2. The other party opens the link and verifies by email OTP.
+3. Both parties accept the terms.
+4. Buyer initializes and confirms payment.
+5. Seller marks the product delivered.
+6. Buyer releases funds to seller wallet.
+7. Seller requests withdrawal to a local bank.
+8. Backend/provider/admin marks the withdrawal as paid after payout settlement.
 
-## 💡 Solution
+## Local Development
 
-**Blackcrow Escrow** introduces a simple escrow system that:
+Install dependencies:
 
-- Holds funds until conditions are met
-- Defines clear release rules
-- Tracks both buyer and seller actions
-- Makes transactions transparent and verifiable
+```bash
+npm install
+```
 
----
+Create `.env` from `.env.example`, then start the server:
 
-## ⚙️ Current State (MVP)
+```bash
+npm start
+```
 
-This project currently includes:
+Open:
 
-- 🏠 **Landing Page** (`landingpage.html`): Public-facing page with hero section, features, testimonials, and CTAs to sign up.
-- 🔐 **Authentication Pages**:
-  - Login (`login.html`) with email/password and social options (Google, Apple, Email).
-  - Signup (`signup.html`) with form fields and social options.
-- 📊 **Escrow Dashboard** (`user.html`): Internal workspace for managing escrows, transactions, and stats.
-- 📦 Transaction tracking system (frontend state)
-- 🔍 Search and filter functionality
-- 📈 Stats (volume, completion rate)
-- 🧾 Escrow creation form
-- 🔄 Status updates (pending → review → completed)
-- 🎨 Consistent dark theme with Manrope font, responsive design, and favicon.
+```text
+http://127.0.0.1:5000
+```
 
-> ⚠️ Note: Data is currently stored in frontend memory (no backend persistence yet). Authentication is simulated via links.
+Run syntax checks:
 
----
+```bash
+npm run check
+```
 
-## 🧠 How It Works
+Run the local end-to-end smoke test while the server is running:
 
-1. Buyer and seller agree on terms
-2. Escrow is created with:
-   - Amount
-   - Inspection period
-   - Release condition
-3. Funds are held (simulated)
-4. Transaction progresses through:
-   - `pending`
-   - `review`
-   - `completed`
-5. Release happens only when condition is met
+```bash
+npm run smoke
+```
 
----
+Run database migrations:
 
-## 🏗️ Tech Stack
+```bash
+npm run migrate
+```
 
-- HTML5
-- CSS3 (Custom UI system with CSS variables)
-- Vanilla JavaScript (state management)
-- SVG icons for social buttons
+## Environment Variables
 
----
+Required for production:
 
-## 🚀 Future Roadmap
+```text
+NODE_ENV=production
+PORT=5000
+DATABASE_URL=postgresql://...
+DATABASE_SSL=true
+ALLOWED_ORIGINS=https://yourdomain.com
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=BlackCrow <verified@yourdomain.com>
+PAYMENT_PROVIDER=paystack
+PAYSTACK_SECRET_KEY=sk_...
+INTERNAL_API_SECRET=long-random-secret
+```
 
-We are actively building toward:
+Development can use:
 
-- 🔐 Backend integration (Node.js / Flask)
-- 💳 Payment integration (Stripe / Paystack / Flutterwave)
-- 👤 Full authentication system
-- 📱 Mobile responsiveness improvements
-- ⚖️ Dispute resolution system
-- 🔔 Notifications system
-- 🌍 Multi-currency support (future reference)
+```text
+PAYMENT_PROVIDER=simulated
+```
 
----
+In production, the backend refuses to start if critical values are missing or still set to local/demo values.
 
-## 🤝 Contributing
+## API Overview
 
-We welcome contributions from developers of all levels.
+Authentication:
 
-### 💡 Good First Contributions:
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 
-- Improve UI/UX (e.g., animations, feedback states)
-- Add mobile responsiveness fixes
-- Improve filtering/search logic
-- Refactor JavaScript into modules
-- Add form validation
-- Convert to React / Vue
-- Enhance accessibility (ARIA labels, keyboard navigation)
+Account:
 
----
+- `GET /api/account/escrows`
+- `POST /api/account/escrows`
+- `GET /api/account/wallet`
+- `GET /api/account/activity`
+- `GET /api/account/withdrawals`
 
-## 🛠️ How to Contribute
+Guest escrow:
 
-1. Fork the repository
-2. Clone your fork
-3. Create a branch:
-   git checkout -b feature/your-feature
-4. Make changes
-5. Commit:
-   - `review`
-   - `completed`
-6. Release happens only when condition is met
+- `POST /api/escrows`
+- `POST /api/escrows/:id/otp`
+- `POST /api/escrows/:id/otp/verify`
+- `PATCH /api/escrows/:id/actions`
 
----
+Payments:
 
-## 🏗️ Tech Stack
+- `POST /api/escrows/:id/payments/initialize`
+- `POST /api/escrows/:id/payments/verify`
+- `POST /api/payments/paystack/webhook`
 
-- HTML5
-- CSS3 (Custom UI system)
-- Vanilla JavaScript (state management)
+Withdrawals:
 
----
+- `POST /api/escrows/:id/withdrawals`
+- `GET /api/escrows/:id/withdrawals`
+- `PATCH /api/internal/withdrawals/:id/paid`
 
-## 🚀 Future Roadmap
+The public list and raw email wallet endpoints are intentionally locked down for production safety.
 
-We are actively building toward:
+## Deployment Checklist
 
-- 🔐 Backend integration (Node.js / Flask)
-- 💳 Payment integration (Stripe / Paystack / Flutterwave)
-- 👤 Authentication system
-- 📱 Mobile responsiveness improvements
-- ⚖️ Dispute resolution system
-- 🔔 Notifications system
-- 🌍 Multi-currency support (future reference)
+- Rotate any connection strings or keys that were shared during development.
+- Set production Neon `DATABASE_URL`.
+- Run `npm run migrate`.
+- Configure verified Resend sender domain.
+- Configure Paystack secret key and test payments.
+- Set `ALLOWED_ORIGINS` to the final domain.
+- Set `INTERNAL_API_SECRET`.
+- Start with `npm start`.
 
----
+## Roadmap
 
-## 🤝 Contributing
-
-We welcome contributions from developers of all levels.
-
-### 💡 Good First Contributions:
-
-- Improve UI/UX
-- Add mobile responsiveness fixes
-- Improve filtering/search logic
-- Refactor JavaScript into modules
-- Add form validation
-- Convert to React / Vue
-
----
-
-## 🛠️ How to Contribute
-
-1. Fork the repository
-2. Clone your fork
-3. Create a branch:
-   git checkout -b feature/your-feature
-4. Make changes
-5. Commit:
-   git commit -m "Added feature"
-6. Push:
-   git push origin feature/your-feature
-7. Open a Pull Request
-
----
-
-## 📌 Project Vision
-
-To become the **default escrow layer for social commerce transactions globally**, starting from Africa.
-
----
-
-## ⭐ Why Contribute?
-
-- Work on a real-world fintech problem
-- Build production-level features
-- Great for portfolio projects
-- Beginner-friendly + scalable architecture
-
----
-
-## 👨‍💻 Author
-
-Musa Ibrahim
+- Real Paystack payment callback/webhook handling.
+- Bank account verification and automated payout provider.
+- Dispute workflow and support inbox.
+- Admin dashboard for payout review and fraud controls.
+- Automated browser regression tests.
