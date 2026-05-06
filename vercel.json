@@ -2,7 +2,7 @@
   "buildCommand": "npm run build && npm run check",
   "outputDirectory": "public",
   "functions": {
-    "api/[...path].js": {
+    "api/**/*.js": {
       "includeFiles": "backend/schema.sql",
       "maxDuration": 10
     }
