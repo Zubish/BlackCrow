@@ -1,5 +1,3 @@
-const { handleRequest } = require("../backend/server");
+const { createVercelHandler } = require("../backend/vercelAdapter");
 
-module.exports = async function handler(request, response) {
-    return handleRequest(request, response);
-};
+module.exports = createVercelHandler();

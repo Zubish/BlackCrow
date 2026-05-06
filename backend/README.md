@@ -64,7 +64,7 @@ npm run smoke
 - `GET /api/health`
 - `POST /api/auth/signup`
 - `POST /api/auth/login`
-- `GET /api/auth/me?token=session_token`
+- `GET /api/auth/me`
 - `GET /api/account/escrows`
 - `POST /api/account/escrows`
 - `GET /api/account/wallet`
@@ -90,6 +90,8 @@ Lifecycle actions are guarded by an email verification session token:
 - `release`
 
 Funding and withdrawal are not generic lifecycle actions. Funding goes through the payment routes, and withdrawal goes through withdrawal request routes.
+
+Account routes use a bearer session token in the `Authorization` header.
 
 ## Payments
 

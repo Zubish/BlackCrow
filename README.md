@@ -124,6 +124,18 @@ Withdrawals:
 
 The public list and raw email wallet endpoints are intentionally locked down for production safety.
 
+## Project Layout
+
+```text
+api/        Vercel serverless adapters for production API routes
+backend/    Node API, storage, migrations, payments, and email services
+docs/       Deployment and contribution notes
+images/     Static image assets
+*.html      Static frontend screens copied to public/ during Vercel builds
+script.js   Frontend behavior and API integration
+style.css   Shared frontend styling
+```
+
 ## Deployment Checklist
 
 - Rotate any connection strings or keys that were shared during development.
@@ -137,7 +149,9 @@ The public list and raw email wallet endpoints are intentionally locked down for
 - Set `INTERNAL_API_SECRET`.
 - Start with `npm start`.
 
-Vercel support is included through `api/[...path].js` and `vercel.json`.
+Vercel support is included through top-level API adapters in `api/` and `vercel.json`.
+
+More deployment detail lives in `docs/DEPLOYMENT.md`.
 
 ## Roadmap
 

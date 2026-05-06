@@ -11,7 +11,7 @@
     "build": "node backend/build-static.js",
     "migrate": "node backend/migrate.js",
     "smoke": "node backend/smoke-test.js",
-    "check": "node --check backend/server.js && node --check backend/email.js && node --check backend/payments.js && node --check backend/migrate.js && node --check backend/smoke-test.js && node --check backend/build-static.js && node --check backend/storage/fileStore.js && node --check backend/storage/postgresStore.js && node --check backend/storage/index.js && node --check script.js"
+    "check": "node --check api/account.js && node --check api/auth.js && node --check api/escrows.js && node --check api/health.js && node --check api/internal.js && node --check api/payments.js && node --check api/wallet.js && node --check backend/server.js && node --check backend/email.js && node --check backend/payments.js && node --check backend/vercelAdapter.js && node --check backend/migrate.js && node --check backend/smoke-test.js && node --check backend/build-static.js && node --check backend/storage/fileStore.js && node --check backend/storage/postgresStore.js && node --check backend/storage/index.js && node --check script.js"
   },
   "dependencies": {
     "pg": "^8.13.1"
