@@ -3,6 +3,26 @@
   "outputDirectory": "public",
   "rewrites": [
     {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth?path=:path*"
+    },
+    {
+      "source": "/api/account/:path*",
+      "destination": "/api/account?path=:path*"
+    },
+    {
+      "source": "/api/escrows/:path*",
+      "destination": "/api/escrows?path=:path*"
+    },
+    {
+      "source": "/api/payments/:path*",
+      "destination": "/api/payments?path=:path*"
+    },
+    {
+      "source": "/api/internal/:path*",
+      "destination": "/api/internal?path=:path*"
+    },
+    {
       "source": "/",
       "destination": "/landingpage.html"
     }
