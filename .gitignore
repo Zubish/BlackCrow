@@ -1,5 +1,6 @@
 backend/data.json
 .env
+vercel-import.env
 node_modules/
 .screenshots/
 public/

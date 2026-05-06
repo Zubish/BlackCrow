@@ -53,8 +53,8 @@ function validateProductionConfig() {
         missing.push("production PUBLIC_APP_URL");
     }
     if (!process.env.RESEND_API_KEY) missing.push("RESEND_API_KEY");
-    if (!process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL.includes("onboarding@resend.dev")) {
-        missing.push("verified RESEND_FROM_EMAIL");
+    if (!process.env.RESEND_FROM_EMAIL) {
+        missing.push("RESEND_FROM_EMAIL");
     }
     if (!process.env.INTERNAL_API_SECRET) missing.push("INTERNAL_API_SECRET");
     if (!ALLOWED_ORIGINS.length || ALLOWED_ORIGINS.some((origin) => origin.includes("localhost") || origin.includes("127.0.0.1"))) {
@@ -70,6 +70,13 @@ function validateProductionConfig() {
     if (missing.length) {
         throw new Error(`Production configuration is incomplete: ${missing.join(", ")}`);
     }
+}
+
+function getEmailSenderMode() {
+    const sender = process.env.RESEND_FROM_EMAIL || "";
+    if (!process.env.RESEND_API_KEY || !sender) return "disabled";
+    if (sender.includes("onboarding@resend.dev")) return "resend-onboarding";
+    return "custom-sender";
 }
 
 function sendJson(response, status, body) {
@@ -745,6 +752,7 @@ async function handleRequest(request, response) {
                 ok: true,
                 service: "blackcrow-api",
                 storage: storage.mode,
+                email: getEmailSenderMode(),
                 escrows: await storage.countEscrows()
             });
         }
