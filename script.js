@@ -91,6 +91,7 @@ const state = {
     currentUser: loadAuthUser(),
     walletBalanceValue: null,
     activityEvents: [],
+    trackingEvidenceList: [],
     trackingSession: loadTrackingSession(),
     transactions: loadTransactions()
 };
@@ -193,6 +194,7 @@ function saveTrackingSession(session) {
 function clearTrackingSession() {
     window.localStorage.removeItem(TRACKING_SESSION_KEY);
     state.trackingSession = null;
+    state.trackingEvidenceList = [];
 }
 
 function getAuthToken() {
@@ -1024,6 +1026,7 @@ async function openTrackedEscrow() {
         state.transactions = [transaction, ...state.transactions.filter((item) => item.id !== transaction.id)];
         state.backendOnline = true;
         saveTransactions();
+        await loadTrackingEvidence(transaction.id, data.token);
         renderAll();
         renderTracking();
         showToast("Escrow access verified.");
@@ -1035,6 +1038,16 @@ async function openTrackedEscrow() {
         } else {
             renderTracking(error.message);
         }
+    }
+}
+
+async function loadTrackingEvidence(escrowId, token) {
+    if (!escrowId || !token) return;
+    try {
+        const data = await apiRequest(`/escrows/${encodeURIComponent(escrowId)}/evidence?token=${encodeURIComponent(token)}`);
+        state.trackingEvidenceList = Array.isArray(data.evidenceList) ? data.evidenceList : [];
+    } catch (error) {
+        state.trackingEvidenceList = [];
     }
 }
 
@@ -1094,6 +1107,7 @@ function renderTracking(errorMessage = "") {
             ${renderTermsSummary(transaction)}
             ${renderDispatchSummary(transaction)}
             ${renderDisputeSummary(transaction)}
+            ${renderEvidenceList()}
             <div class="status-list">
                 ${steps.map(([label, isDone]) => `
                     <span class="${isDone ? "is-done" : ""}">${escapeHtml(label)}</span>
@@ -1127,7 +1141,28 @@ function renderDispatchSummary(transaction) {
 function renderDisputeSummary(transaction) {
     const dispute = transaction.dispute || {};
     if (!dispute.status) return "";
-    return `<p class="micro-copy">Dispute: ${escapeHtml(dispute.reason || "Open")} | ${escapeHtml(dispute.status)}</p>`;
+    const resolution = dispute.resolution?.outcome ? ` | ${dispute.resolution.outcome.replace(/_/g, " ")}` : "";
+    return `<p class="micro-copy">Dispute: ${escapeHtml(dispute.reason || "Open")} | ${escapeHtml(dispute.status)}${escapeHtml(resolution)}</p>`;
+}
+
+function renderEvidenceList() {
+    if (!state.trackingEvidenceList.length) {
+        return `<p class="micro-copy">Evidence locker: no extra evidence submitted yet.</p>`;
+    }
+
+    return `
+        <div class="evidence-list">
+            <p class="micro-copy">Evidence locker</p>
+            ${state.trackingEvidenceList.map((evidence) => `
+                <article class="evidence-item">
+                    <strong>${escapeHtml(evidence.title)}</strong>
+                    <span>${escapeHtml(evidence.submittedByRole)} | ${escapeHtml(evidence.evidenceType)}</span>
+                    ${evidence.notes ? `<p>${escapeHtml(evidence.notes)}</p>` : ""}
+                    ${evidence.link ? `<a href="${escapeHtml(evidence.link)}" target="_blank" rel="noopener">View evidence</a>` : ""}
+                </article>
+            `).join("")}
+        </div>
+    `;
 }
 
 function getTrackingActions(transaction, role) {
@@ -1156,7 +1191,10 @@ function getTrackingActions(transaction, role) {
     }
 
     if (lifecycle.disputed) {
-        return `<div class="empty-state">A dispute is open. Funds are locked while BlackCrow reviews the transaction terms, dispatch proof, and evidence.</div>`;
+        return `
+            <div class="empty-state">A dispute is open. Funds are locked while BlackCrow reviews the transaction terms, dispatch proof, and evidence.</div>
+            ${renderEvidenceForm()}
+        `;
     }
 
     if (role === "seller" && lifecycle.funded && !lifecycle.dispatched) {
@@ -1241,6 +1279,36 @@ function getTrackingActions(transaction, role) {
     return `<div class="empty-state">No action is needed from you right now.</div>`;
 }
 
+function renderEvidenceForm() {
+    return `
+        <form class="composer-form compact-action-form" id="evidence-form">
+            <label>
+                Evidence type
+                <select id="evidence-type">
+                    <option value="delivery">Delivery or waybill</option>
+                    <option value="product_condition">Product condition</option>
+                    <option value="chat_record">Chat record</option>
+                    <option value="payment_record">Payment record</option>
+                    <option value="other">Other</option>
+                </select>
+            </label>
+            <label>
+                Title
+                <input type="text" id="evidence-title" placeholder="Waybill receipt, unboxing video, chat screenshot" required>
+            </label>
+            <label>
+                Evidence link
+                <input type="url" id="evidence-link" placeholder="Paste image, video, or document link">
+            </label>
+            <label>
+                Notes
+                <textarea id="evidence-notes" rows="3" placeholder="Explain what this evidence proves"></textarea>
+            </label>
+            <button class="primary-button" type="button" data-track-action="add-evidence">Add evidence</button>
+        </form>
+    `;
+}
+
 function getDispatchProof() {
     return {
         courierName: document.getElementById("dispatch-courier")?.value.trim() || "",
@@ -1264,6 +1332,19 @@ function getDisputeDetails() {
 
 function hasValidDisputeDetails(dispute) {
     return dispute.reason && dispute.details;
+}
+
+function getEvidenceDetails() {
+    return {
+        evidenceType: document.getElementById("evidence-type")?.value || "general",
+        title: document.getElementById("evidence-title")?.value.trim() || "",
+        link: document.getElementById("evidence-link")?.value.trim() || "",
+        notes: document.getElementById("evidence-notes")?.value.trim() || ""
+    };
+}
+
+function hasValidEvidenceDetails(evidence) {
+    return evidence.title && (evidence.link || evidence.notes);
 }
 
 function getWithdrawalDestination() {
@@ -1387,6 +1468,23 @@ async function updateTrackedEscrow(action) {
                         dispute
                     }
                 });
+            } else if (action === "add-evidence") {
+                const evidence = getEvidenceDetails();
+                if (!hasValidEvidenceDetails(evidence)) {
+                    showToast("Add an evidence title and either notes or a link.");
+                    return;
+                }
+                data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/evidence`, {
+                    method: "POST",
+                    body: {
+                        token: context.token,
+                        evidence
+                    }
+                });
+                state.trackingEvidenceList = Array.isArray(data.evidenceList) ? data.evidenceList : [];
+                renderTracking();
+                showToast("Evidence added.");
+                return;
             } else {
                 data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/actions`, {
                     method: "PATCH",
@@ -1404,6 +1502,7 @@ async function updateTrackedEscrow(action) {
             });
             state.backendOnline = true;
             saveTransactions();
+            await loadTrackingEvidence(transaction.id, state.trackingSession.token);
             if (action === "initialize-payment" && isExternalPaymentUrl(data.payment?.authorizationUrl)) {
                 showToast("Opening secure payment page.");
                 window.location.href = data.payment.authorizationUrl;

@@ -60,6 +60,21 @@ function toCamelWithdrawal(row) {
     };
 }
 
+function toCamelEvidence(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        escrowId: row.escrow_id,
+        submittedByEmail: row.submitted_by_email,
+        submittedByRole: row.submitted_by_role,
+        evidenceType: row.evidence_type,
+        title: row.title,
+        notes: row.notes,
+        link: row.link,
+        createdAt: row.created_at
+    };
+}
+
 function toDbTimestamp(value) {
     return new Date(value).toISOString();
 }
@@ -279,6 +294,52 @@ async function createPostgresStore() {
                 ]
             );
             return toCamelEscrow(result.rows[0]);
+        },
+
+        async createDisputeEvidence(evidence) {
+            const result = await pool.query(
+                `insert into dispute_evidence (
+                    id, escrow_id, submitted_by_email, submitted_by_role,
+                    evidence_type, title, notes, link, created_at
+                ) values (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9
+                )
+                returning *`,
+                [
+                    evidence.id,
+                    evidence.escrowId,
+                    evidence.submittedByEmail,
+                    evidence.submittedByRole,
+                    evidence.evidenceType,
+                    evidence.title,
+                    evidence.notes,
+                    evidence.link,
+                    toDbTimestamp(evidence.createdAt)
+                ]
+            );
+            return toCamelEvidence(result.rows[0]);
+        },
+
+        async listDisputeEvidenceForEscrow(escrowId) {
+            const result = await pool.query(
+                `select * from dispute_evidence
+                 where escrow_id = $1
+                 order by created_at desc`,
+                [escrowId]
+            );
+            return result.rows.map(toCamelEvidence);
+        },
+
+        async listDisputedEscrows(limit = 50) {
+            const result = await pool.query(
+                `select * from escrows
+                 where lifecycle->>'disputed' = 'true'
+                    or dispute->>'status' in ('open', 'extended_review')
+                 order by updated_at desc
+                 limit $1`,
+                [limit]
+            );
+            return result.rows.map(toCamelEscrow);
         },
 
         async createPaymentInitialization(payment) {

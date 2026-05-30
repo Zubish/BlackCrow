@@ -431,6 +431,29 @@ function publicWithdrawal(withdrawal, includeDestination = false) {
     return body;
 }
 
+function publicEvidence(evidence) {
+    return {
+        id: evidence.id,
+        escrowId: evidence.escrowId,
+        submittedByRole: evidence.submittedByRole,
+        evidenceType: evidence.evidenceType,
+        title: evidence.title,
+        notes: evidence.notes,
+        link: evidence.link,
+        createdAt: evidence.createdAt
+    };
+}
+
+function requireInternalAccess(request, response) {
+    const internalSecret = process.env.INTERNAL_API_SECRET || "";
+    const suppliedSecret = request.headers["x-internal-api-secret"] || "";
+    if (!internalSecret || suppliedSecret !== internalSecret) {
+        sendJson(response, 403, { error: "Internal access required." });
+        return false;
+    }
+    return true;
+}
+
 function checkOtpRateLimit(escrowId, email) {
     const key = `${escrowId}:${email}`;
     const now = Date.now();
@@ -555,6 +578,21 @@ function validateDispute(dispute) {
     return "";
 }
 
+function cleanEvidence(payload = {}) {
+    return {
+        evidenceType: String(payload.evidenceType || "general").trim().slice(0, 80),
+        title: String(payload.title || "").trim().slice(0, 140),
+        notes: String(payload.notes || "").trim().slice(0, 1200),
+        link: String(payload.link || "").trim().slice(0, 500)
+    };
+}
+
+function validateEvidence(evidence) {
+    if (!evidence.title) return "Evidence title is required.";
+    if (!evidence.notes && !evidence.link) return "Add either evidence notes or an evidence link.";
+    return "";
+}
+
 async function findEscrow(id) {
     return storage.getEscrow(id);
 }
@@ -636,6 +674,95 @@ async function applyLifecycleAction(escrow, role, action, actorEmail, payload = 
     escrow.updatedAt = nowIso();
     const savedEscrow = await storage.updateEscrow(escrow);
     return { escrow: publicEscrow(savedEscrow) };
+}
+
+async function addDisputeEvidence(escrow, session, payload) {
+    const lifecycle = normalizeLifecycle(escrow.lifecycle);
+    if (!lifecycle.disputed && !["open", "extended_review"].includes(escrow.dispute?.status)) {
+        return { error: "Evidence can only be added after a dispute is opened." };
+    }
+
+    const clean = cleanEvidence(payload);
+    const error = validateEvidence(clean);
+    if (error) return { error };
+
+    const evidence = await storage.createDisputeEvidence({
+        id: createId("evd"),
+        escrowId: escrow.id,
+        submittedByEmail: session.email,
+        submittedByRole: session.role || "internal",
+        evidenceType: clean.evidenceType,
+        title: clean.title,
+        notes: clean.notes,
+        link: clean.link,
+        createdAt: nowIso()
+    });
+    await addEvent(escrow.id, "dispute.evidence_added", session.email, `${session.role} added dispute evidence.`);
+    const evidenceList = await storage.listDisputeEvidenceForEscrow(escrow.id);
+    return {
+        evidence: publicEvidence(evidence),
+        evidenceList: evidenceList.map(publicEvidence)
+    };
+}
+
+async function resolveDispute(escrow, payload, actorEmail = "internal") {
+    const lifecycle = normalizeLifecycle(escrow.lifecycle);
+    if (!lifecycle.disputed && !["open", "extended_review"].includes(escrow.dispute?.status)) {
+        return { error: "This escrow does not have an open dispute." };
+    }
+
+    const outcome = String(payload.outcome || "").trim();
+    const allowed = new Set(["release", "refund", "partial_settlement", "extended_review"]);
+    if (!allowed.has(outcome)) return { error: "Unsupported dispute outcome." };
+
+    const note = String(payload.note || "").trim().slice(0, 1200);
+    const amount = Number(payload.amount || 0);
+    const now = nowIso();
+    const resolution = {
+        outcome,
+        note,
+        amount: Number.isFinite(amount) && amount > 0 ? amount : null,
+        resolvedBy: actorEmail,
+        resolvedAt: now
+    };
+
+    const dispute = {
+        ...(escrow.dispute || {}),
+        status: outcome === "extended_review" ? "extended_review" : "resolved",
+        resolution
+    };
+
+    let status = escrow.status;
+    let message = "Dispute outcome recorded.";
+    if (outcome === "release") {
+        lifecycle.released = true;
+        lifecycle.disputed = false;
+        status = "completed";
+        message = "Dispute resolved in favor of release to seller wallet.";
+    } else if (outcome === "refund") {
+        lifecycle.disputed = false;
+        status = "completed";
+        message = "Dispute resolved for buyer refund handling.";
+    } else if (outcome === "partial_settlement") {
+        lifecycle.disputed = false;
+        status = "completed";
+        message = "Dispute resolved with partial settlement.";
+    } else {
+        lifecycle.disputed = true;
+        status = "review";
+        message = "Dispute marked for extended review.";
+    }
+
+    const updatedEscrow = await storage.updateEscrow({
+        ...escrow,
+        status,
+        lifecycle,
+        dispute,
+        note: note || message,
+        updatedAt: now
+    });
+    await addEvent(escrow.id, "dispute.resolved", actorEmail, message);
+    return { escrow: publicEscrow(updatedEscrow) };
 }
 
 async function getEscrowPartySession(escrow, payload) {
@@ -1135,6 +1262,25 @@ async function handleRequest(request, response) {
             return sendJson(response, 200, { ...result, role: session.role });
         }
 
+        const escrowEvidenceMatch = pathname.match(/^\/api\/escrows\/([^/]+)\/evidence$/);
+        if ((request.method === "GET" || request.method === "POST") && escrowEvidenceMatch) {
+            const escrow = await findEscrow(escrowEvidenceMatch[1]);
+            if (!escrow) return sendJson(response, 404, { error: "Escrow not found." });
+
+            const payload = request.method === "POST" ? await readJson(request) : { token: url.searchParams.get("token") };
+            const session = await getValidSession(escrow, payload.token);
+            if (!session || !session.role) return sendJson(response, 403, { error: "Valid email session required." });
+
+            if (request.method === "GET") {
+                const evidenceList = await storage.listDisputeEvidenceForEscrow(escrow.id);
+                return sendJson(response, 200, { evidenceList: evidenceList.map(publicEvidence), role: session.role });
+            }
+
+            const result = await addDisputeEvidence(escrow, session, payload.evidence || payload);
+            if (result.error) return sendJson(response, 400, result);
+            return sendJson(response, 201, { ...result, role: session.role });
+        }
+
         const escrowPaymentInitMatch = pathname.match(/^\/api\/escrows\/([^/]+)\/payments\/initialize$/);
         if (request.method === "POST" && escrowPaymentInitMatch) {
             const escrow = await findEscrow(escrowPaymentInitMatch[1]);
@@ -1198,13 +1344,42 @@ async function handleRequest(request, response) {
             });
         }
 
+        if (request.method === "GET" && pathname === "/api/internal/disputes") {
+            if (!requireInternalAccess(request, response)) return;
+
+            const limit = Math.min(Number(url.searchParams.get("limit") || 50), 100);
+            const escrows = await storage.listDisputedEscrows(limit);
+            return sendJson(response, 200, { escrows: escrows.map(publicEscrow) });
+        }
+
+        const internalDisputeEvidenceMatch = pathname.match(/^\/api\/internal\/escrows\/([^/]+)\/evidence$/);
+        if (request.method === "GET" && internalDisputeEvidenceMatch) {
+            if (!requireInternalAccess(request, response)) return;
+
+            const escrow = await findEscrow(internalDisputeEvidenceMatch[1]);
+            if (!escrow) return sendJson(response, 404, { error: "Escrow not found." });
+            const evidenceList = await storage.listDisputeEvidenceForEscrow(escrow.id);
+            return sendJson(response, 200, {
+                escrow: publicEscrow(escrow),
+                evidenceList: evidenceList.map(publicEvidence)
+            });
+        }
+
+        const internalResolveDisputeMatch = pathname.match(/^\/api\/internal\/escrows\/([^/]+)\/dispute\/resolve$/);
+        if (request.method === "PATCH" && internalResolveDisputeMatch) {
+            if (!requireInternalAccess(request, response)) return;
+
+            const escrow = await findEscrow(internalResolveDisputeMatch[1]);
+            if (!escrow) return sendJson(response, 404, { error: "Escrow not found." });
+            const payload = await readJson(request);
+            const result = await resolveDispute(escrow, payload, "internal");
+            if (result.error) return sendJson(response, 400, result);
+            return sendJson(response, 200, result);
+        }
+
         const internalWithdrawalPaidMatch = pathname.match(/^\/api\/internal\/withdrawals\/([^/]+)\/paid$/);
         if (request.method === "PATCH" && internalWithdrawalPaidMatch) {
-            const internalSecret = process.env.INTERNAL_API_SECRET || "";
-            const suppliedSecret = request.headers["x-internal-api-secret"] || "";
-            if (!internalSecret || suppliedSecret !== internalSecret) {
-                return sendJson(response, 403, { error: "Internal access required." });
-            }
+            if (!requireInternalAccess(request, response)) return;
 
             const result = await markWithdrawalPaid(internalWithdrawalPaidMatch[1], "internal");
             if (result.error) return sendJson(response, 400, result);

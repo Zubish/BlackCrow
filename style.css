@@ -1133,6 +1133,38 @@ body::before {
     color: #dce6f0;
 }
 
+.evidence-list {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 0.35rem;
+}
+
+.evidence-item {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.evidence-item strong,
+.evidence-item p {
+    margin: 0;
+}
+
+.evidence-item span {
+    color: var(--muted);
+    font-size: 0.82rem;
+    text-transform: capitalize;
+}
+
+.evidence-item a {
+    color: var(--accent-strong);
+    font-weight: 800;
+    text-decoration: none;
+}
+
 .status-list,
 .action-stack {
     display: flex;

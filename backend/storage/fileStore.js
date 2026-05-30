@@ -10,6 +10,7 @@ const defaultStore = {
     escrows: [],
     payments: [],
     withdrawals: [],
+    disputeEvidence: [],
     otps: [],
     sessions: [],
     events: []
@@ -133,6 +134,25 @@ function createFileStore() {
             store.escrows = store.escrows.map((item) => (item.id === escrow.id ? escrow : item));
             saveStore(store);
             return escrow;
+        },
+
+        async createDisputeEvidence(evidence) {
+            store.disputeEvidence.unshift(evidence);
+            saveStore(store);
+            return evidence;
+        },
+
+        async listDisputeEvidenceForEscrow(escrowId) {
+            return store.disputeEvidence
+                .filter((evidence) => evidence.escrowId === escrowId)
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        },
+
+        async listDisputedEscrows(limit = 50) {
+            return store.escrows
+                .filter((escrow) => escrow.lifecycle?.disputed || ["open", "extended_review"].includes(escrow.dispute?.status))
+                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+                .slice(0, limit);
         },
 
         async createPaymentInitialization(payment) {

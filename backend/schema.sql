@@ -155,6 +155,21 @@ create table if not exists escrow_events (
 create index if not exists escrow_events_escrow_id_idx on escrow_events (escrow_id);
 create index if not exists escrow_events_created_at_idx on escrow_events (created_at desc);
 
+create table if not exists dispute_evidence (
+    id text primary key,
+    escrow_id text not null references escrows (id) on delete cascade,
+    submitted_by_email text not null,
+    submitted_by_role text not null check (submitted_by_role in ('buyer', 'seller', 'internal')),
+    evidence_type text not null,
+    title text not null,
+    notes text not null default '',
+    link text not null default '',
+    created_at timestamptz not null default now()
+);
+
+create index if not exists dispute_evidence_escrow_id_idx on dispute_evidence (escrow_id);
+create index if not exists dispute_evidence_created_at_idx on dispute_evidence (created_at desc);
+
 create table if not exists payment_initializations (
     id text primary key,
     escrow_id text not null references escrows (id) on delete cascade,
