@@ -86,6 +86,68 @@
                     <input type="text" name="itemDescription" placeholder="Phone, fashion order, website project" required>
                 </label>
 
+                <div class="split-fields">
+                    <label>
+                        Category
+                        <select name="category">
+                            <option value="General goods">General goods</option>
+                            <option value="Phones and gadgets">Phones and gadgets</option>
+                            <option value="Fashion order">Fashion order</option>
+                            <option value="Wholesale goods">Wholesale goods</option>
+                            <option value="Service or custom work">Service or custom work</option>
+                        </select>
+                    </label>
+                    <label>
+                        Condition
+                        <select name="itemCondition">
+                            <option value="New">New</option>
+                            <option value="Used">Used</option>
+                            <option value="Refurbished">Refurbished</option>
+                            <option value="Custom order">Custom order</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="split-fields">
+                    <label>
+                        Quantity
+                        <input type="text" name="quantity" placeholder="1 item, 2 cartons, 10 yards">
+                    </label>
+                    <label>
+                        Inspection window
+                        <select name="inspectionDays">
+                            <option value="1">24 hours</option>
+                            <option value="2" selected>48 hours</option>
+                            <option value="3">72 hours</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="split-fields">
+                    <label>
+                        Delivery method
+                        <select name="deliveryMethod">
+                            <option value="Home delivery">Home delivery</option>
+                            <option value="Pickup station">Pickup station</option>
+                            <option value="Waybill or park delivery">Waybill or park delivery</option>
+                            <option value="Digital delivery">Digital delivery</option>
+                        </select>
+                    </label>
+                    <label>
+                        Preferred courier
+                        <input type="text" name="preferredCourier" placeholder="GIG, DHL, bus park, rider">
+                    </label>
+                </div>
+
+                <label>
+                    Who handles shipping?
+                    <select name="shippingResponsibility">
+                        <option value="Seller handles shipping">Seller handles shipping</option>
+                        <option value="Buyer handles pickup">Buyer handles pickup</option>
+                        <option value="Both parties agree outside BlackCrow">Both parties agree outside BlackCrow</option>
+                    </select>
+                </label>
+
                 <label>
                     Release condition
                     <select name="releaseCondition">
@@ -114,7 +176,8 @@
                     <li>Create the link with both emails.</li>
                     <li>Both parties open the link and verify by email.</li>
                     <li>Buyer initializes payment, then confirms simulated funding.</li>
-                    <li>Seller delivers, buyer releases, seller withdraws.</li>
+                    <li>Seller submits dispatch proof before marking delivery.</li>
+                    <li>Buyer releases funds or opens a dispute with evidence.</li>
                 </ol>
             </article>
             <article class="feature-card">

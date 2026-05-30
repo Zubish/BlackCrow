@@ -4,7 +4,7 @@ const path = require("path");
 loadEnv();
 
 const baseUrl = process.env.SMOKE_BASE_URL || `http://127.0.0.1:${process.env.PORT || 5000}/api`;
-const smokeDomain = "blackcrow-smoke.test";
+const smokeDomain = "example.com";
 
 async function main() {
     let escrowId = "";
@@ -22,6 +22,15 @@ async function main() {
                 amount: 7500,
                 item: "Smoke test item",
                 condition: "Buyer confirms delivery",
+                terms: {
+                    category: "General goods",
+                    itemCondition: "New",
+                    quantity: "1",
+                    deliveryMethod: "Home delivery",
+                    preferredCourier: "Smoke Courier",
+                    shippingResponsibility: "Seller handles shipping",
+                    inspectionDays: 2
+                },
                 initiatorRole: "buyer"
             }
         });
@@ -48,6 +57,18 @@ async function main() {
             body: {
                 token: buyer.token,
                 providerReference: payment.payment.providerReference
+            }
+        });
+        await request(`/escrows/${escrowId}/actions`, {
+            method: "PATCH",
+            body: {
+                token: seller.token,
+                action: "dispatch",
+                dispatchProof: {
+                    courierName: "Smoke Courier",
+                    waybillNumber: `SMK-${Date.now()}`,
+                    dispatchNote: "Smoke test dispatch proof."
+                }
             }
         });
         await request(`/escrows/${escrowId}/actions`, {

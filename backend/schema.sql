@@ -33,6 +33,9 @@ create table if not exists escrows (
     condition text not null,
     inspection_days integer not null default 5 check (inspection_days > 0),
     item text not null,
+    terms jsonb not null default '{}'::jsonb,
+    dispatch_proof jsonb not null default '{}'::jsonb,
+    dispute jsonb not null default '{}'::jsonb,
     note text not null,
     initiator_role text not null check (initiator_role in ('buyer', 'seller')),
     creator_user_id text references users (id) on delete set null,
@@ -44,7 +47,9 @@ create table if not exists escrows (
         "paymentConfirmed": false,
         "withdrawalRequested": false,
         "funded": false,
+        "dispatched": false,
         "delivered": false,
+        "disputed": false,
         "released": false,
         "withdrawn": false
     }'::jsonb,
@@ -59,6 +64,22 @@ create index if not exists escrows_created_at_idx on escrows (created_at desc);
 
 alter table escrows add column if not exists creator_user_id text references users (id) on delete set null;
 alter table escrows add column if not exists creation_mode text not null default 'guest';
+alter table escrows add column if not exists terms jsonb not null default '{}'::jsonb;
+alter table escrows add column if not exists dispatch_proof jsonb not null default '{}'::jsonb;
+alter table escrows add column if not exists dispute jsonb not null default '{}'::jsonb;
+alter table escrows alter column lifecycle set default '{
+    "buyerAccepted": false,
+    "sellerAccepted": false,
+    "paymentInitialized": false,
+    "paymentConfirmed": false,
+    "withdrawalRequested": false,
+    "funded": false,
+    "dispatched": false,
+    "delivered": false,
+    "disputed": false,
+    "released": false,
+    "withdrawn": false
+}'::jsonb;
 create index if not exists escrows_creator_user_id_idx on escrows (creator_user_id);
 
 create table if not exists escrow_otps (

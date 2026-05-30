@@ -11,6 +11,9 @@ function toCamelEscrow(row) {
         condition: row.condition,
         inspectionDays: Number(row.inspection_days),
         item: row.item,
+        terms: row.terms || {},
+        dispatchProof: row.dispatch_proof || {},
+        dispute: row.dispute || {},
         note: row.note,
         initiatorRole: row.initiator_role,
         creatorUserId: row.creator_user_id,
@@ -159,12 +162,12 @@ async function createPostgresStore() {
             const result = await pool.query(
                 `insert into escrows (
                     id, buyer_name, seller_name, buyer_email, seller_email, amount, status,
-                    condition, inspection_days, item, note, initiator_role, creator_user_id, creation_mode,
-                    lifecycle, created_at, updated_at
+                    condition, inspection_days, item, terms, dispatch_proof, dispute, note,
+                    initiator_role, creator_user_id, creation_mode, lifecycle, created_at, updated_at
                 ) values (
                     $1, $2, $3, $4, $5, $6, $7,
                     $8, $9, $10, $11, $12, $13, $14,
-                    $15, $16, $17
+                    $15, $16, $17, $18, $19, $20
                 )
                 returning *`,
                 [
@@ -178,6 +181,9 @@ async function createPostgresStore() {
                     escrow.condition,
                     escrow.inspectionDays,
                     escrow.item,
+                    escrow.terms || {},
+                    escrow.dispatchProof || {},
+                    escrow.dispute || {},
                     escrow.note,
                     escrow.initiatorRole,
                     escrow.creatorUserId,
@@ -196,7 +202,9 @@ async function createPostgresStore() {
                  set status = $2,
                      note = $3,
                      lifecycle = $4,
-                     updated_at = $5
+                     dispatch_proof = $5,
+                     dispute = $6,
+                     updated_at = $7
                  where id = $1
                  returning *`,
                 [
@@ -204,6 +212,8 @@ async function createPostgresStore() {
                     escrow.status,
                     escrow.note,
                     escrow.lifecycle,
+                    escrow.dispatchProof || {},
+                    escrow.dispute || {},
                     toDbTimestamp(escrow.updatedAt)
                 ]
             );

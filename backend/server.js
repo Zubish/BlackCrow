@@ -296,7 +296,9 @@ function normalizeLifecycle(lifecycle = {}) {
         paymentConfirmed: Boolean(lifecycle.paymentConfirmed),
         withdrawalRequested: Boolean(lifecycle.withdrawalRequested),
         funded: Boolean(lifecycle.funded),
+        dispatched: Boolean(lifecycle.dispatched),
         delivered: Boolean(lifecycle.delivered),
+        disputed: Boolean(lifecycle.disputed),
         released: Boolean(lifecycle.released),
         withdrawn: Boolean(lifecycle.withdrawn)
     };
@@ -398,6 +400,9 @@ async function createEscrow(payload, creatorUser = null) {
         condition: String(payload.condition || "Delivery confirmation").trim(),
         inspectionDays: Number(payload.inspectionDays || 5),
         item: String(payload.item || "Protected transaction").trim(),
+        terms: cleanEscrowTerms(payload.terms || payload),
+        dispatchProof: {},
+        dispute: {},
         note: "Awaiting both parties to accept escrow terms.",
         initiatorRole: payload.initiatorRole === "buyer" ? "buyer" : "seller",
         creatorUserId: creatorUser?.id || null,
@@ -409,7 +414,9 @@ async function createEscrow(payload, creatorUser = null) {
             paymentConfirmed: false,
             withdrawalRequested: false,
             funded: false,
+            dispatched: false,
             delivered: false,
+            disputed: false,
             released: false,
             withdrawn: false
         },
@@ -421,6 +428,54 @@ async function createEscrow(payload, creatorUser = null) {
     await addEvent(savedEscrow.id, "escrow.created", buyerEmail, "Escrow link created.");
 
     return { escrow: publicEscrow(savedEscrow) };
+}
+
+function cleanEscrowTerms(payload = {}) {
+    const inspectionDays = Number(payload.inspectionDays || 2);
+    return {
+        category: String(payload.category || "General goods").trim().slice(0, 80),
+        itemCondition: String(payload.itemCondition || "Not specified").trim().slice(0, 80),
+        quantity: String(payload.quantity || "1").trim().slice(0, 40),
+        deliveryMethod: String(payload.deliveryMethod || "To be agreed").trim().slice(0, 120),
+        preferredCourier: String(payload.preferredCourier || "").trim().slice(0, 120),
+        shippingResponsibility: String(payload.shippingResponsibility || "seller").trim().slice(0, 40),
+        inspectionDays: Number.isFinite(inspectionDays) && inspectionDays > 0 ? Math.min(inspectionDays, 7) : 2
+    };
+}
+
+function cleanDispatchProof(payload = {}) {
+    return {
+        courierName: String(payload.courierName || "").trim().slice(0, 120),
+        waybillNumber: String(payload.waybillNumber || "").trim().slice(0, 120),
+        dispatchNote: String(payload.dispatchNote || "").trim().slice(0, 600),
+        evidenceLink: String(payload.evidenceLink || "").trim().slice(0, 500),
+        submittedAt: nowIso()
+    };
+}
+
+function validateDispatchProof(proof) {
+    if (!proof.courierName || !proof.waybillNumber) {
+        return "Courier name and waybill/tracking number are required before dispatch can be recorded.";
+    }
+    return "";
+}
+
+function cleanDispute(payload = {}, role = "") {
+    return {
+        openedBy: role,
+        reason: String(payload.reason || "").trim().slice(0, 120),
+        details: String(payload.details || "").trim().slice(0, 1000),
+        evidenceLink: String(payload.evidenceLink || "").trim().slice(0, 500),
+        status: "open",
+        openedAt: nowIso()
+    };
+}
+
+function validateDispute(dispute) {
+    if (!dispute.reason || !dispute.details) {
+        return "Dispute reason and explanation are required.";
+    }
+    return "";
 }
 
 async function findEscrow(id) {
@@ -440,7 +495,7 @@ async function getValidSession(escrow, token) {
     return { ...session, role: roleForEmail(escrow, session.email) };
 }
 
-async function applyLifecycleAction(escrow, role, action, actorEmail) {
+async function applyLifecycleAction(escrow, role, action, actorEmail, payload = {}) {
     const lifecycle = normalizeLifecycle(escrow.lifecycle);
     const accepted = lifecycle.buyerAccepted && lifecycle.sellerAccepted;
 
@@ -456,13 +511,40 @@ async function applyLifecycleAction(escrow, role, action, actorEmail) {
     } else if (action === "deliver") {
         if (role !== "seller") return { error: "Only the seller can mark delivery." };
         if (!lifecycle.funded) return { error: "Escrow must be funded before delivery." };
+        if (!lifecycle.dispatched) return { error: "Dispatch proof must be submitted before delivery can be marked." };
+        if (lifecycle.disputed) return { error: "Delivery cannot be changed while a dispute is open." };
         lifecycle.delivered = true;
         escrow.status = "review";
         escrow.note = "Seller marked delivery complete. Waiting for buyer release.";
         await addEvent(escrow.id, "escrow.delivered", actorEmail, "Seller marked the product delivered.");
+    } else if (action === "dispatch") {
+        if (role !== "seller") return { error: "Only the seller can submit dispatch proof." };
+        if (!lifecycle.funded) return { error: "Escrow must be funded before dispatch proof is submitted." };
+        if (lifecycle.disputed) return { error: "Dispatch proof cannot be changed while a dispute is open." };
+        const dispatchProof = cleanDispatchProof(payload.dispatchProof || payload);
+        const dispatchError = validateDispatchProof(dispatchProof);
+        if (dispatchError) return { error: dispatchError };
+        lifecycle.dispatched = true;
+        escrow.dispatchProof = dispatchProof;
+        escrow.status = "review";
+        escrow.note = "Seller submitted dispatch proof. Waiting for delivery confirmation.";
+        await addEvent(escrow.id, "escrow.dispatched", actorEmail, "Seller submitted dispatch proof.");
+    } else if (action === "dispute") {
+        if (!lifecycle.funded) return { error: "Escrow must be funded before a dispute can be opened." };
+        if (lifecycle.released) return { error: "Funds have already been released." };
+        if (lifecycle.disputed) return { error: "A dispute is already open for this escrow." };
+        const dispute = cleanDispute(payload.dispute || payload, role);
+        const disputeError = validateDispute(dispute);
+        if (disputeError) return { error: disputeError };
+        lifecycle.disputed = true;
+        escrow.dispute = dispute;
+        escrow.status = "review";
+        escrow.note = "Dispute opened. BlackCrow will review the terms, dispatch proof, and submitted evidence.";
+        await addEvent(escrow.id, "escrow.disputed", actorEmail, `${role} opened a dispute.`);
     } else if (action === "release") {
         if (role !== "buyer") return { error: "Only the buyer can release funds." };
         if (!lifecycle.delivered) return { error: "Seller delivery must be marked before release." };
+        if (lifecycle.disputed) return { error: "Funds cannot be released while a dispute is open." };
         lifecycle.released = true;
         escrow.status = "completed";
         escrow.note = "Buyer released funds to seller wallet.";
@@ -957,7 +1039,7 @@ async function handleRequest(request, response) {
             const session = await getValidSession(escrow, payload.token);
             if (!session || !session.role) return sendJson(response, 403, { error: "Valid email session required." });
 
-            const result = await applyLifecycleAction(escrow, session.role, payload.action, session.email);
+            const result = await applyLifecycleAction(escrow, session.role, payload.action, session.email, payload);
             if (result.error) return sendJson(response, 400, result);
             return sendJson(response, 200, { ...result, role: session.role });
         }

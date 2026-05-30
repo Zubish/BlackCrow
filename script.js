@@ -17,7 +17,9 @@ const defaultTransactions = [
             paymentConfirmed: false,
             withdrawalRequested: false,
             funded: false,
+            dispatched: false,
             delivered: false,
+            disputed: false,
             released: false,
             withdrawn: false
         },
@@ -41,7 +43,9 @@ const defaultTransactions = [
             paymentConfirmed: true,
             withdrawalRequested: false,
             funded: true,
+            dispatched: false,
             delivered: false,
+            disputed: false,
             released: false,
             withdrawn: false
         },
@@ -65,7 +69,9 @@ const defaultTransactions = [
             paymentConfirmed: true,
             withdrawalRequested: false,
             funded: true,
+            dispatched: true,
             delivered: true,
+            disputed: false,
             released: true,
             withdrawn: false
         },
@@ -344,6 +350,9 @@ function addLocalEscrow(payload) {
         condition: payload.condition,
         inspectionDays: Number(payload.inspectionDays || 5),
         item: payload.item,
+        terms: payload.terms || {},
+        dispatchProof: {},
+        dispute: {},
         note: `Awaiting ${counterpartyRole} acceptance and buyer funding.`,
         initiatorRole: payload.initiatorRole,
         lifecycle: {
@@ -353,7 +362,9 @@ function addLocalEscrow(payload) {
             paymentConfirmed: false,
             withdrawalRequested: false,
             funded: false,
+            dispatched: false,
             delivered: false,
+            disputed: false,
             released: false,
             withdrawn: false
         },
@@ -384,9 +395,24 @@ function normalizeLifecycle(lifecycle = {}) {
         paymentConfirmed: Boolean(lifecycle.paymentConfirmed),
         withdrawalRequested: Boolean(lifecycle.withdrawalRequested),
         funded: Boolean(lifecycle.funded),
+        dispatched: Boolean(lifecycle.dispatched),
         delivered: Boolean(lifecycle.delivered),
+        disputed: Boolean(lifecycle.disputed),
         released: Boolean(lifecycle.released),
         withdrawn: Boolean(lifecycle.withdrawn)
+    };
+}
+
+function collectEscrowTerms(formData) {
+    const inspectionDays = Number(formData.get("inspectionDays") || 2);
+    return {
+        category: formData.get("category") || "General goods",
+        itemCondition: formData.get("itemCondition") || "Not specified",
+        quantity: formData.get("quantity") || "1",
+        deliveryMethod: formData.get("deliveryMethod") || "To be agreed",
+        preferredCourier: formData.get("preferredCourier") || "",
+        shippingResponsibility: formData.get("shippingResponsibility") || "seller",
+        inspectionDays: Number.isFinite(inspectionDays) && inspectionDays > 0 ? inspectionDays : 2
     };
 }
 
@@ -747,8 +773,9 @@ function bindForm() {
             sellerEmail,
             amount: Number(formData.get("amount")),
             condition: formData.get("releaseCondition"),
-            inspectionDays: 5,
+            inspectionDays: Number(formData.get("inspectionDays") || 2),
             item: itemDescription,
+            terms: collectEscrowTerms(formData),
             initiatorRole
         };
 
@@ -813,8 +840,9 @@ function bindGuestEscrowForm() {
             sellerEmail,
             amount: Number(formData.get("amount")),
             condition: formData.get("releaseCondition"),
-            inspectionDays: 5,
+            inspectionDays: Number(formData.get("inspectionDays") || 2),
             item: formData.get("itemDescription").trim(),
+            terms: collectEscrowTerms(formData),
             initiatorRole
         };
 
@@ -951,7 +979,9 @@ function renderTracking(errorMessage = "") {
         ["Seller accepted", lifecycle.sellerAccepted],
         ["Payment initialized", lifecycle.paymentInitialized],
         ["Funding confirmed", lifecycle.paymentConfirmed],
+        ["Dispatch proof", lifecycle.dispatched],
         ["Seller delivered", lifecycle.delivered],
+        ["Dispute opened", lifecycle.disputed],
         ["Buyer released", lifecycle.released],
         ["Withdrawal requested", lifecycle.withdrawalRequested],
         ["Seller withdrawn", lifecycle.withdrawn]
@@ -964,6 +994,9 @@ function renderTracking(errorMessage = "") {
             <strong>${escapeHtml(transaction.buyer)} -> ${escapeHtml(transaction.seller)}</strong>
             <p>${escapeHtml(transaction.item || "Protected transaction")} - ${currency.format(transaction.amount)}</p>
             <p>${escapeHtml(transaction.condition)}</p>
+            ${renderTermsSummary(transaction)}
+            ${renderDispatchSummary(transaction)}
+            ${renderDisputeSummary(transaction)}
             <div class="status-list">
                 ${steps.map(([label, isDone]) => `
                     <span class="${isDone ? "is-done" : ""}">${escapeHtml(label)}</span>
@@ -972,6 +1005,32 @@ function renderTracking(errorMessage = "") {
         </article>
     `;
     elements.trackingActions.innerHTML = getTrackingActions(transaction, role);
+}
+
+function renderTermsSummary(transaction) {
+    const terms = transaction.terms || {};
+    if (!Object.keys(terms).length) return "";
+    const parts = [
+        terms.category,
+        terms.itemCondition,
+        terms.quantity ? `Qty ${terms.quantity}` : "",
+        terms.deliveryMethod,
+        terms.preferredCourier,
+        terms.inspectionDays ? `${terms.inspectionDays} day inspection` : ""
+    ].filter(Boolean);
+    return `<p class="micro-copy">Terms: ${escapeHtml(parts.join(" | "))}</p>`;
+}
+
+function renderDispatchSummary(transaction) {
+    const proof = transaction.dispatchProof || {};
+    if (!proof.courierName && !proof.waybillNumber) return "";
+    return `<p class="micro-copy">Dispatch: ${escapeHtml(proof.courierName || "Courier")} | ${escapeHtml(proof.waybillNumber || "No waybill")}</p>`;
+}
+
+function renderDisputeSummary(transaction) {
+    const dispute = transaction.dispute || {};
+    if (!dispute.status) return "";
+    return `<p class="micro-copy">Dispute: ${escapeHtml(dispute.reason || "Open")} | ${escapeHtml(dispute.status)}</p>`;
 }
 
 function getTrackingActions(transaction, role) {
@@ -999,12 +1058,63 @@ function getTrackingActions(transaction, role) {
         return `<div class="empty-state">Waiting for buyer to initialize and confirm payment.</div>`;
     }
 
-    if (role === "seller" && lifecycle.funded && !lifecycle.delivered) {
+    if (lifecycle.disputed) {
+        return `<div class="empty-state">A dispute is open. Funds are locked while BlackCrow reviews the transaction terms, dispatch proof, and evidence.</div>`;
+    }
+
+    if (role === "seller" && lifecycle.funded && !lifecycle.dispatched) {
+        return `
+            <form class="composer-form compact-action-form" id="dispatch-form">
+                <label>
+                    Courier or dispatch channel
+                    <input type="text" id="dispatch-courier" placeholder="GIG Logistics, DHL, bus park, local rider" required>
+                </label>
+                <label>
+                    Waybill or tracking number
+                    <input type="text" id="dispatch-waybill" placeholder="Waybill or tracking reference" required>
+                </label>
+                <label>
+                    Evidence link
+                    <input type="url" id="dispatch-evidence" placeholder="Link to receipt/photo/video, if available">
+                </label>
+                <label>
+                    Dispatch note
+                    <textarea id="dispatch-note" rows="3" placeholder="Where it was sent from, recipient details, and expected timeline"></textarea>
+                </label>
+                <button class="primary-button" type="button" data-track-action="dispatch">Submit dispatch proof</button>
+            </form>
+        `;
+    }
+
+    if (role === "seller" && lifecycle.funded && lifecycle.dispatched && !lifecycle.delivered) {
         return `<button class="primary-button" type="button" data-track-action="deliver">Mark product delivered</button>`;
     }
 
     if (role === "buyer" && lifecycle.delivered && !lifecycle.released) {
-        return `<button class="primary-button" type="button" data-track-action="release">Release funds to seller wallet</button>`;
+        return `
+            <button class="primary-button" type="button" data-track-action="release">Release funds to seller wallet</button>
+            <form class="composer-form compact-action-form" id="dispute-form">
+                <label>
+                    Dispute reason
+                    <select id="dispute-reason">
+                        <option value="Item not received">Item not received</option>
+                        <option value="Wrong item received">Wrong item received</option>
+                        <option value="Damaged item">Damaged item</option>
+                        <option value="Counterfeit or misrepresented item">Counterfeit or misrepresented item</option>
+                        <option value="Release condition not met">Release condition not met</option>
+                    </select>
+                </label>
+                <label>
+                    Explanation
+                    <textarea id="dispute-details" rows="3" placeholder="Describe what happened and what evidence you have" required></textarea>
+                </label>
+                <label>
+                    Evidence link
+                    <input type="url" id="dispute-evidence" placeholder="Link to unboxing video/photos, if available">
+                </label>
+                <button class="action-button" type="button" data-track-action="dispute">Open dispute</button>
+            </form>
+        `;
     }
 
     if (role === "seller" && lifecycle.released && !lifecycle.withdrawalRequested && !lifecycle.withdrawn) {
@@ -1032,6 +1142,31 @@ function getTrackingActions(transaction, role) {
     }
 
     return `<div class="empty-state">No action is needed from you right now.</div>`;
+}
+
+function getDispatchProof() {
+    return {
+        courierName: document.getElementById("dispatch-courier")?.value.trim() || "",
+        waybillNumber: document.getElementById("dispatch-waybill")?.value.trim() || "",
+        evidenceLink: document.getElementById("dispatch-evidence")?.value.trim() || "",
+        dispatchNote: document.getElementById("dispatch-note")?.value.trim() || ""
+    };
+}
+
+function hasValidDispatchProof(proof) {
+    return proof.courierName && proof.waybillNumber;
+}
+
+function getDisputeDetails() {
+    return {
+        reason: document.getElementById("dispute-reason")?.value || "",
+        details: document.getElementById("dispute-details")?.value.trim() || "",
+        evidenceLink: document.getElementById("dispute-evidence")?.value.trim() || ""
+    };
+}
+
+function hasValidDisputeDetails(dispute) {
+    return dispute.reason && dispute.details;
 }
 
 function getWithdrawalDestination() {
@@ -1127,6 +1262,34 @@ async function updateTrackedEscrow(action) {
                         payoutDestination
                     }
                 });
+            } else if (action === "dispatch") {
+                const dispatchProof = getDispatchProof();
+                if (!hasValidDispatchProof(dispatchProof)) {
+                    showToast("Add courier and waybill details before submitting dispatch proof.");
+                    return;
+                }
+                data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/actions`, {
+                    method: "PATCH",
+                    body: {
+                        token: context.token,
+                        action,
+                        dispatchProof
+                    }
+                });
+            } else if (action === "dispute") {
+                const dispute = getDisputeDetails();
+                if (!hasValidDisputeDetails(dispute)) {
+                    showToast("Add a dispute reason and explanation.");
+                    return;
+                }
+                data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/actions`, {
+                    method: "PATCH",
+                    body: {
+                        token: context.token,
+                        action,
+                        dispute
+                    }
+                });
             } else {
                 data = await apiRequest(`/escrows/${encodeURIComponent(context.transaction.id)}/actions`, {
                     method: "PATCH",
@@ -1188,11 +1351,41 @@ async function updateTrackedEscrow(action) {
             note = "Buyer funding confirmed. Waiting for seller delivery.";
         }
         if (action === "deliver") {
+            if (!lifecycle.dispatched) {
+                showToast("Submit dispatch proof before marking delivery.");
+                return transaction;
+            }
             lifecycle.delivered = true;
             status = "review";
             note = "Seller marked delivery complete. Waiting for buyer release.";
         }
+        if (action === "dispatch") {
+            const dispatchProof = getDispatchProof();
+            if (!hasValidDispatchProof(dispatchProof)) {
+                showToast("Add courier and waybill details before submitting dispatch proof.");
+                return transaction;
+            }
+            lifecycle.dispatched = true;
+            status = "review";
+            note = "Seller submitted dispatch proof. Waiting for delivery confirmation.";
+            return { ...transaction, dispatchProof, lifecycle, status, note, updatedAt: "Just now" };
+        }
+        if (action === "dispute") {
+            const dispute = getDisputeDetails();
+            if (!hasValidDisputeDetails(dispute)) {
+                showToast("Add a dispute reason and explanation.");
+                return transaction;
+            }
+            lifecycle.disputed = true;
+            status = "review";
+            note = "Dispute opened. BlackCrow will review the submitted evidence.";
+            return { ...transaction, dispute: { ...dispute, status: "open" }, lifecycle, status, note, updatedAt: "Just now" };
+        }
         if (action === "release") {
+            if (lifecycle.disputed) {
+                showToast("Funds cannot be released while a dispute is open.");
+                return transaction;
+            }
             lifecycle.released = true;
             status = "completed";
             note = "Buyer released funds to seller wallet.";
