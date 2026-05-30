@@ -6,6 +6,7 @@ const DATA_FILE = path.join(__dirname, "..", "data.json");
 const defaultStore = {
     users: [],
     userSessions: [],
+    passwordResets: [],
     escrows: [],
     payments: [],
     withdrawals: [],
@@ -51,6 +52,26 @@ function createFileStore() {
             return user;
         },
 
+        async updateUserPassword(userId, passwordHash, updatedAt) {
+            let updatedUser = null;
+            store.users = store.users.map((user) => {
+                if (user.id !== userId) return user;
+                updatedUser = {
+                    ...user,
+                    passwordHash,
+                    updatedAt
+                };
+                return updatedUser;
+            });
+            saveStore(store);
+            return updatedUser;
+        },
+
+        async deleteUserSessions(userId) {
+            store.userSessions = store.userSessions.filter((session) => session.userId !== userId);
+            saveStore(store);
+        },
+
         async createUserSession(session) {
             store.userSessions.push(session);
             saveStore(store);
@@ -62,6 +83,27 @@ function createFileStore() {
                 item.token === token
                 && new Date(item.expiresAt).getTime() > nowMs
             )) || null;
+        },
+
+        async createPasswordReset(reset) {
+            store.passwordResets.unshift(reset);
+            saveStore(store);
+            return reset;
+        },
+
+        async getValidPasswordReset(tokenHash, nowMs) {
+            return store.passwordResets.find((reset) => (
+                reset.tokenHash === tokenHash
+                && !reset.usedAt
+                && new Date(reset.expiresAt).getTime() > nowMs
+            )) || null;
+        },
+
+        async markPasswordResetUsed(id, usedAt) {
+            store.passwordResets = store.passwordResets.map((reset) => (
+                reset.id === id ? { ...reset, usedAt } : reset
+            ));
+            saveStore(store);
         },
 
         async listEscrows(email = "") {

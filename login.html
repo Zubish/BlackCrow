@@ -29,7 +29,16 @@
                     </div>
                     <div class="form-group">
                         <label for="login-password">Password</label>
-                        <input type="password" id="login-password" name="password" required>
+                        <div class="password-field">
+                            <input type="password" id="login-password" name="password" required>
+                            <button class="password-toggle" type="button" aria-label="Show password" data-toggle-password="login-password">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                                    <circle cx="12" cy="12" r="2.6"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                        <button class="auth-text-button" id="forgot-password-button" type="button">Forgot password?</button>
                     </div>
                     <button class="primary-button" type="submit">Log In</button>
                 </div>

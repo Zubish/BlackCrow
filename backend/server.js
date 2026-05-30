@@ -2,7 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { sendEscrowOtpEmail, shouldExposeDevCode } = require("./email");
+const { sendEscrowOtpEmail, sendPasswordResetEmail, shouldExposeDevCode } = require("./email");
 const { createPaymentProvider } = require("./payments");
 const { createStorage } = require("./storage");
 
@@ -18,6 +18,7 @@ const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || "")
 const OTP_TTL_MS = 10 * 60 * 1000;
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const USER_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
 const OTP_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const OTP_RATE_LIMIT_MAX = 5;
 let storage;
@@ -209,6 +210,14 @@ function createToken() {
     return crypto.randomBytes(24).toString("hex");
 }
 
+function createLongToken() {
+    return crypto.randomBytes(32).toString("base64url");
+}
+
+function hashResetToken(token) {
+    return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 function createId(prefix) {
     return `${prefix}_${crypto.randomBytes(12).toString("hex")}`;
 }
@@ -219,6 +228,18 @@ function createOtp() {
 
 function nowIso() {
     return new Date().toISOString();
+}
+
+function getPublicAppUrl(request) {
+    const configured = String(process.env.PUBLIC_APP_URL || "").replace(/\/+$/, "");
+    if (configured) return configured;
+
+    const protocol = request.headers["x-forwarded-proto"] || "http";
+    return `${protocol}://${request.headers.host}`;
+}
+
+function createPasswordResetUrl(request, token) {
+    return `${getPublicAppUrl(request)}/reset-password.html?token=${encodeURIComponent(token)}`;
 }
 
 function publicEscrow(escrow) {
@@ -262,6 +283,62 @@ async function createAuthSession(user) {
     };
     await storage.createUserSession(session);
     return session;
+}
+
+async function requestPasswordReset(request, payload) {
+    const email = normalizeEmail(payload.email);
+    if (!email) return { error: "Email is required." };
+
+    const user = await storage.getUserByEmail(email);
+    const neutralResponse = {
+        message: "If an account exists for that email, a password reset link has been sent."
+    };
+
+    if (!user) return neutralResponse;
+
+    const token = createLongToken();
+    const reset = {
+        id: createId("reset"),
+        userId: user.id,
+        tokenHash: hashResetToken(token),
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS).toISOString(),
+        createdAt: nowIso()
+    };
+    await storage.createPasswordReset(reset);
+
+    const resetUrl = createPasswordResetUrl(request, token);
+    const emailResult = await sendPasswordResetEmail({
+        to: user.email,
+        resetUrl,
+        user
+    });
+
+    if (!emailResult.sent && shouldExposeDevCode()) {
+        return {
+            ...neutralResponse,
+            devResetUrl: resetUrl
+        };
+    }
+
+    return neutralResponse;
+}
+
+async function confirmPasswordReset(payload) {
+    const token = String(payload.token || "").trim();
+    const password = String(payload.password || "");
+    if (!token || !password) return { error: "Reset token and new password are required." };
+    if (password.length < 8) return { error: "Password must be at least 8 characters." };
+
+    const reset = await storage.getValidPasswordReset(hashResetToken(token), Date.now());
+    if (!reset) return { error: "This reset link is invalid or has expired." };
+
+    const user = await storage.getUserById(reset.userId);
+    if (!user) return { error: "This reset link is invalid or has expired." };
+
+    await storage.updateUserPassword(user.id, hashPassword(password), nowIso());
+    await storage.markPasswordResetUsed(reset.id, nowIso());
+    await storage.deleteUserSessions(user.id);
+    return { message: "Password reset successful. You can now log in." };
 }
 
 function getAuthToken(request, url) {
@@ -878,6 +955,20 @@ async function handleRequest(request, response) {
 
             const session = await createAuthSession(user);
             return sendJson(response, 200, { user: publicUser(user), token: session.token });
+        }
+
+        if (request.method === "POST" && pathname === "/api/auth/password-reset/request") {
+            const payload = await readJson(request);
+            const result = await requestPasswordReset(request, payload);
+            if (result.error) return sendJson(response, 400, result);
+            return sendJson(response, 200, result);
+        }
+
+        if (request.method === "POST" && pathname === "/api/auth/password-reset/confirm") {
+            const payload = await readJson(request);
+            const result = await confirmPasswordReset(payload);
+            if (result.error) return sendJson(response, 400, result);
+            return sendJson(response, 200, result);
         }
 
         if (request.method === "GET" && pathname === "/api/auth/me") {

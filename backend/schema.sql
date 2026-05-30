@@ -11,6 +11,32 @@ create table if not exists users (
 
 create index if not exists users_email_idx on users (email);
 
+alter table users add column if not exists full_name text;
+update users set full_name = coalesce(full_name, email) where full_name is null;
+alter table users alter column full_name set not null;
+alter table users drop column if exists name;
+alter table users drop column if exists role;
+alter table users drop column if exists status;
+alter table users drop column if exists kyc_status;
+alter table users drop column if exists reporter_verified;
+alter table users drop column if exists first_name;
+alter table users drop column if exists last_name;
+alter table users drop column if exists phone_number;
+alter table users drop column if exists user_type;
+alter table users drop column if exists profile_image_url;
+alter table users drop column if exists bio;
+alter table users drop column if exists location;
+alter table users drop column if exists city;
+alter table users drop column if exists state;
+alter table users drop column if exists country;
+alter table users drop column if exists rating;
+alter table users drop column if exists total_reviews;
+alter table users drop column if exists is_verified;
+alter table users drop column if exists legal_use_accepted_at;
+alter table users drop column if exists residential_area;
+alter table users drop column if exists emergency_contact_name;
+alter table users drop column if exists emergency_contact_phone;
+
 create table if not exists user_sessions (
     id bigserial primary key,
     user_id text not null references users (id) on delete cascade,
@@ -21,6 +47,18 @@ create table if not exists user_sessions (
 
 create index if not exists user_sessions_user_id_idx on user_sessions (user_id);
 create index if not exists user_sessions_expires_at_idx on user_sessions (expires_at);
+
+create table if not exists password_reset_tokens (
+    id text primary key,
+    user_id text not null references users (id) on delete cascade,
+    token_hash text not null unique,
+    expires_at timestamptz not null,
+    used_at timestamptz,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists password_reset_tokens_user_id_idx on password_reset_tokens (user_id);
+create index if not exists password_reset_tokens_expires_at_idx on password_reset_tokens (expires_at);
 
 create table if not exists escrows (
     id text primary key,

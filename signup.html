@@ -37,11 +37,27 @@
                     </div>
                     <div class="form-group">
                         <label for="signup-password">Password</label>
-                        <input type="password" id="signup-password" name="password" required>
+                        <div class="password-field">
+                            <input type="password" id="signup-password" name="password" minlength="8" required>
+                            <button class="password-toggle" type="button" aria-label="Show password" data-toggle-password="signup-password">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                                    <circle cx="12" cy="12" r="2.6"></circle>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="signup-confirm-password">Confirm Password</label>
-                        <input type="password" id="signup-confirm-password" name="confirm-password" required>
+                        <div class="password-field">
+                            <input type="password" id="signup-confirm-password" name="confirm-password" minlength="8" required>
+                            <button class="password-toggle" type="button" aria-label="Show password" data-toggle-password="signup-confirm-password">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                                    <circle cx="12" cy="12" r="2.6"></circle>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <button class="primary-button" type="submit">Sign Up</button>
                 </div>

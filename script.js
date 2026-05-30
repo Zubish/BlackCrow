@@ -130,12 +130,17 @@ const elements = {
     statCompleted: document.getElementById("stat-completed"),
     loginForm: document.getElementById("login-form"),
     signupForm: document.getElementById("signup-form"),
+    resetPasswordForm: document.getElementById("reset-password-form"),
     loginIdentifier: document.getElementById("login-identifier"),
     loginPassword: document.getElementById("login-password"),
+    forgotPasswordButton: document.getElementById("forgot-password-button"),
     signupName: document.getElementById("signup-name"),
     signupEmail: document.getElementById("signup-email"),
     signupPassword: document.getElementById("signup-password"),
     signupConfirmPassword: document.getElementById("signup-confirm-password"),
+    resetToken: document.getElementById("reset-token"),
+    resetPassword: document.getElementById("reset-password"),
+    resetConfirmPassword: document.getElementById("reset-confirm-password"),
     toast: document.getElementById("toast")
 };
 
@@ -671,8 +676,12 @@ function bindWalletBalance() {
 }
 
 function bindAuthForms() {
+    bindPasswordToggles();
+
     elements.loginForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
+
+        if (!elements.loginForm.reportValidity()) return;
 
         const email = elements.loginIdentifier.value.trim().toLowerCase();
         const password = elements.loginPassword.value;
@@ -689,8 +698,32 @@ function bindAuthForms() {
         }
     });
 
+    elements.forgotPasswordButton?.addEventListener("click", async () => {
+        const email = elements.loginIdentifier.value.trim().toLowerCase();
+        if (!email) {
+            elements.loginIdentifier.focus();
+            showToast("Enter your account email first.");
+            return;
+        }
+
+        elements.forgotPasswordButton.disabled = true;
+        try {
+            const data = await apiRequest("/auth/password-reset/request", {
+                method: "POST",
+                body: { email }
+            });
+            showToast(data.message || "If that account exists, a reset link has been sent.");
+        } catch (error) {
+            showToast(error.message);
+        } finally {
+            elements.forgotPasswordButton.disabled = false;
+        }
+    });
+
     elements.signupForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
+
+        if (!elements.signupForm.reportValidity()) return;
 
         const password = elements.signupPassword.value;
         const confirmPassword = elements.signupConfirmPassword.value;
@@ -721,6 +754,70 @@ function bindAuthForms() {
     [elements.signupPassword, elements.signupConfirmPassword].forEach((input) => {
         input?.addEventListener("input", () => {
             elements.signupConfirmPassword?.setCustomValidity("");
+        });
+    });
+
+    bindResetPasswordForm();
+}
+
+function bindPasswordToggles() {
+    document.querySelectorAll("[data-toggle-password]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const input = document.getElementById(button.dataset.togglePassword);
+            if (!input) return;
+
+            const shouldShow = input.type === "password";
+            input.type = shouldShow ? "text" : "password";
+            button.setAttribute("aria-label", shouldShow ? "Hide password" : "Show password");
+            button.classList.toggle("is-visible", shouldShow);
+        });
+    });
+}
+
+function bindResetPasswordForm() {
+    if (!elements.resetPasswordForm) return;
+
+    const token = new URLSearchParams(window.location.search).get("token") || "";
+    elements.resetToken.value = token;
+    if (!token) {
+        showToast("Reset link is missing. Request a new password reset.");
+    }
+
+    elements.resetPasswordForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!elements.resetPasswordForm.reportValidity()) return;
+
+        const password = elements.resetPassword.value;
+        const confirmPassword = elements.resetConfirmPassword.value;
+        if (password !== confirmPassword) {
+            elements.resetConfirmPassword.setCustomValidity("Passwords must match.");
+            elements.resetConfirmPassword.reportValidity();
+            return;
+        }
+
+        elements.resetConfirmPassword.setCustomValidity("");
+
+        try {
+            const data = await apiRequest("/auth/password-reset/confirm", {
+                method: "POST",
+                body: {
+                    token: elements.resetToken.value,
+                    password
+                }
+            });
+            clearAuthSession();
+            showToast(data.message || "Password reset successful.");
+            setTimeout(() => {
+                window.location.href = "login.html";
+            }, 1200);
+        } catch (error) {
+            showToast(error.message);
+        }
+    });
+
+    [elements.resetPassword, elements.resetConfirmPassword].forEach((input) => {
+        input?.addEventListener("input", () => {
+            elements.resetConfirmPassword?.setCustomValidity("");
         });
     });
 }

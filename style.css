@@ -1399,6 +1399,10 @@ body::before {
     box-shadow: var(--shadow);
 }
 
+.auth-container-narrow {
+    max-width: 440px;
+}
+
 .auth-brand {
     justify-content: center;
     margin-bottom: 2rem;
@@ -1498,6 +1502,65 @@ body::before {
     background: var(--bg-soft);
     color: var(--text);
     font-family: inherit;
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-field input {
+    padding-right: 3rem;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.45rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transform: translateY(-50%);
+}
+
+.password-toggle:hover {
+    color: var(--accent-strong);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.password-toggle svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.auth-text-button {
+    display: inline-flex;
+    width: fit-content;
+    margin-top: 0.55rem;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.auth-text-button:hover {
+    color: var(--accent-strong);
 }
 
 .form-group input:focus {

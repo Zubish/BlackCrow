@@ -13,6 +13,7 @@ const files = [
     "overview.html",
     "privacy.html",
     "quick-escrow.html",
+    "reset-password.html",
     "script.js",
     "signup.html",
     "style.css",

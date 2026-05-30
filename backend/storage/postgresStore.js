@@ -112,6 +112,22 @@ async function createPostgresStore() {
             return toCamelUser(result.rows[0]);
         },
 
+        async updateUserPassword(userId, passwordHash, updatedAt) {
+            const result = await pool.query(
+                `update users
+                 set password_hash = $2,
+                     updated_at = $3
+                 where id = $1
+                 returning *`,
+                [userId, passwordHash, toDbTimestamp(updatedAt)]
+            );
+            return toCamelUser(result.rows[0]);
+        },
+
+        async deleteUserSessions(userId) {
+            await pool.query("delete from user_sessions where user_id = $1", [userId]);
+        },
+
         async createUserSession(session) {
             await pool.query(
                 `insert into user_sessions (user_id, token, expires_at)
@@ -129,6 +145,51 @@ async function createPostgresStore() {
                 [token, toDbTimestamp(nowMs)]
             );
             return result.rows[0] || null;
+        },
+
+        async createPasswordReset(reset) {
+            const result = await pool.query(
+                `insert into password_reset_tokens (id, user_id, token_hash, expires_at, used_at, created_at)
+                 values ($1, $2, $3, $4, null, $5)
+                 returning id,
+                           user_id as "userId",
+                           token_hash as "tokenHash",
+                           expires_at as "expiresAt",
+                           used_at as "usedAt",
+                           created_at as "createdAt"`,
+                [
+                    reset.id,
+                    reset.userId,
+                    reset.tokenHash,
+                    toDbTimestamp(reset.expiresAt),
+                    toDbTimestamp(reset.createdAt)
+                ]
+            );
+            return result.rows[0];
+        },
+
+        async getValidPasswordReset(tokenHash, nowMs) {
+            const result = await pool.query(
+                `select id,
+                        user_id as "userId",
+                        token_hash as "tokenHash",
+                        expires_at as "expiresAt",
+                        used_at as "usedAt",
+                        created_at as "createdAt"
+                 from password_reset_tokens
+                 where token_hash = $1 and used_at is null and expires_at > $2`,
+                [tokenHash, toDbTimestamp(nowMs)]
+            );
+            return result.rows[0] || null;
+        },
+
+        async markPasswordResetUsed(id, usedAt) {
+            await pool.query(
+                `update password_reset_tokens
+                 set used_at = $2
+                 where id = $1`,
+                [id, toDbTimestamp(usedAt)]
+            );
         },
 
         async listEscrows(email = "") {
